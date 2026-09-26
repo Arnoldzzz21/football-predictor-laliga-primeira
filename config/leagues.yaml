@@ -1,0 +1,27 @@
+leagues:
+  laliga:
+    name: LaLiga EA Sports            # no lo usa setup_data_lake.py hoy, pero lo va a pedir el frontend
+    country: Spain
+    country_flag_iso2: ES
+    historical_seasons:
+      - "2023-2024"
+      - "2024-2025"
+      - "2025-2026"
+    active_season: "2026-2027"
+    promoted_2026_27:
+      - RC Deportivo
+      - Real Racing Club
+      - Málaga CF
+
+  primeira_liga:
+    name: Primeira Liga
+    country: Portugal
+    country_flag_iso2: PT
+    historical_seasons:
+      - "2023-2024"
+      - "2024-2025"
+      - "2025-2026"
+    active_season: "2026-2027"
+    promoted_2026_27:
+      - Marítimo
+      - Académico de Viseu
