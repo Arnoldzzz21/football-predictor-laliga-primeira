@@ -54,7 +54,15 @@ def write_partition(
 def read_partition(path: Path) -> pa.Table:
     if not path.exists():
         raise FileNotFoundError(f"No existe la partición: {path}")
-    return pq.read_table(path)
+    # partitioning=None: cada partición es UN archivo concreto (no un directorio
+    # a escanear). Sin esto, pyarrow intenta inferir columnas Hive a partir de
+    # segmentos "clave=valor" en la ruta (p. ej. "season=2026-2027") y choca con
+    # la columna real "season" que ya vive dentro del archivo -- eso revienta
+    # con ArrowTypeError ("Unable to merge: Field season has incompatible
+    # types: string vs dictionary<...>") en pyarrow >=17 al construir el
+    # dataset. Como aquí siempre apuntamos a un archivo exacto, no hay nada
+    # que particionar.
+    return pq.read_table(path, partitioning=None)
 
 
 def read_league_season(lake_root: Path, layer: str, league: str, season: str, filename: str = "matches.parquet") -> pa.Table:
@@ -78,7 +86,8 @@ def read_league_all_seasons(lake_root: Path, layer: str, league: str, filename: 
     for season_dir in sorted(league_dir.glob("season=*")):
         f = season_dir / filename
         if f.exists():
-            tables.append(pq.read_table(f))
+            # partitioning=None por la misma razón que en read_partition().
+            tables.append(pq.read_table(f, partitioning=None))
     if not tables:
         raise FileNotFoundError(f"No hay particiones para {league} en {layer}")
     return pa.concat_tables(tables, promote_options="default")
