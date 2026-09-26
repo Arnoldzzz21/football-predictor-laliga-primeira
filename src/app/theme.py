@@ -135,10 +135,15 @@ def inject() -> None:
             background: rgba(139,92,246,0.18) !important;
         }}
 
-        /* botones Prev/Next del selector de jornada (dentro de la
-           tarjeta MATCHDAY) -- mismo tratamiento oscuro/morado que el
-           selectbox, en vez del boton claro por defecto de Streamlit */
-        div[data-testid="stVerticalBlockBorderWrapper"] div[data-testid="stButton"] button {{
+        /* botones Prev/Next del selector de jornada -- mismo tratamiento
+           oscuro/morado que el selectbox, en vez del boton claro por
+           defecto de Streamlit. Se ancla a la clase "st-key-<key>" que
+           Streamlit genera para todo widget con `key=...` (mecanismo
+           documentado y estable), en vez de data-testid="stVerticalBlockBorderWrapper"
+           -- ese wrapper ya no envuelve a los botones en la version actual
+           de Streamlit Cloud (verificado via DOM live), por eso la regla
+           anterior nunca hacia match. */
+        div[class*="st-key-md_select_"] button {{
             background: {CARD_BG} !important;
             border: 1px solid {BORDER_SOFT} !important;
             color: {TEXT} !important;
@@ -146,11 +151,16 @@ def inject() -> None:
             min-height: 2.35rem;
             padding: 0 !important;
         }}
-        div[data-testid="stVerticalBlockBorderWrapper"] div[data-testid="stButton"] button:hover:not(:disabled) {{
+        div[class*="st-key-md_select_"] button * {{
+            color: {TEXT} !important;
+        }}
+        div[class*="st-key-md_select_"] button:hover:not(:disabled) {{
             border-color: rgba(139,92,246,0.55) !important;
+        }}
+        div[class*="st-key-md_select_"] button:hover:not(:disabled) * {{
             color: {ACCENT_LIGHT} !important;
         }}
-        div[data-testid="stVerticalBlockBorderWrapper"] div[data-testid="stButton"] button:disabled {{
+        div[class*="st-key-md_select_"] button:disabled {{
             opacity: 0.3;
         }}
 
