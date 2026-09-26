@@ -30,12 +30,20 @@ def flag_svg(iso2: str, w: int = 28, h: int = 19) -> str:
 
 
 def _score_block(iso2: str, home_txt: str, away_txt: str, color: str, size: int = 30) -> str:
+    # .strip(): esta funcion se interpola DENTRO de otros f-strings
+    # multilinea (played_match_row, upcoming_match_card). Sin strip(), el
+    # salto de linea inicial de este bloque, sumado a la indentacion de la
+    # linea que lo llama, deja una linea compuesta solo por espacios justo
+    # antes del div del equipo visitante -- el parser de Markdown de
+    # Streamlit interpreta eso como fin del bloque HTML y el siguiente
+    # <div> (indentado 4 espacios) como bloque de codigo, mostrando el
+    # nombre del equipo visitante como texto crudo en vez de renderizado.
     return f"""
     <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
       {flag_svg(iso2)}
       <div class="fp-score" style="font-size:{size}px; color:{color};">{home_txt} – {away_txt}</div>
     </div>
-    """
+    """.strip()
 
 
 def played_match_row(home_name: str, away_name: str, iso2: str,
