@@ -126,6 +126,13 @@ def match_projection(home_key: str, away_key: str, matchday: int,
     }
 
 
+def outcome_confidence(p_home: float, p_draw: float, p_away: float, result: str) -> float:
+    """Probabilidad (0-1) que el modelo le dio al resultado 1X2 (H/D/A) que
+    realmente ocurrio en el partido -- el 'le pego en X%' que se muestra
+    junto al resultado final en la app."""
+    return {"H": p_home, "D": p_draw, "A": p_away}.get(result, 0.0)
+
+
 def matchday_status(matches: pd.DataFrame) -> tuple[int | None, int | None]:
     """(ultima jornada jugada, proxima jornada) para esta liga/temporada."""
     finished = matches[matches.status == "FINISHED"]

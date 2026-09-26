@@ -83,6 +83,73 @@ def inject() -> None:
             border: none; height: 2px; margin: 4px 0 18px 0;
             background: linear-gradient(90deg, rgba(139,92,246,0) 0%, {ACCENT} 50%, rgba(139,92,246,0) 100%);
         }}
+
+        /* -- Segmentadores (radio de liga, selectboxes de equipo/jornada) --
+           Streamlit 1.4x+ arma st.radio/st.selectbox sobre react-aria, con
+           data-testid/data-selected/role estables (a diferencia de las
+           clases st-emotion-cache-* que cambian de build a build) -- por
+           eso todos los selectores de abajo se apoyan en esos atributos,
+           nunca en un nombre de clase generado. */
+
+        div[data-testid="stRadioGroup"] {{
+            gap: 10px !important;
+        }}
+        label[data-testid="stRadioOption"] {{
+            background: {CARD_BG};
+            border: 1px solid {BORDER_SOFT};
+            border-radius: 999px;
+            padding: 9px 18px !important;
+            transition: background 0.15s ease, border-color 0.15s ease;
+        }}
+        label[data-testid="stRadioOption"][data-selected="true"] {{
+            background: rgba(139,92,246,0.18);
+            border-color: rgba(139,92,246,0.55);
+        }}
+        /* apaga el punto/dot nativo del radio, ya lo reemplaza el pill */
+        label[data-testid="stRadioOption"] > div > div:first-child {{
+            display: none;
+        }}
+        label[data-testid="stRadioOption"] [data-testid="stMarkdownContainer"] p {{
+            color: {MUTED}; font-size: 13px; font-weight: 600; margin: 0;
+            white-space: nowrap;
+        }}
+        label[data-testid="stRadioOption"][data-selected="true"] [data-testid="stMarkdownContainer"] p {{
+            color: {ACCENT_LIGHT};
+        }}
+
+        div[data-testid="stSelectbox"] [role="group"] {{
+            background: {CARD_BG} !important;
+            border: 1px solid {BORDER_SOFT} !important;
+            border-radius: 12px !important;
+            transition: border-color 0.15s ease;
+        }}
+        div[data-testid="stSelectbox"] [role="group"]:focus-within {{
+            border-color: rgba(139,92,246,0.55) !important;
+        }}
+        div[data-testid="stSelectbox"] input[role="combobox"] {{
+            color: {TEXT} !important;
+            font-size: 13px !important;
+            font-weight: 600 !important;
+        }}
+        div[data-testid="stSelectbox"] button[aria-haspopup="listbox"] {{
+            color: {MUTED_DIM} !important;
+        }}
+        /* menu desplegable (se monta en un portal, por eso va suelto y no
+           anidado bajo stSelectbox) */
+        [role="listbox"] {{
+            background: {CARD_BG} !important;
+            border: 1px solid rgba(139,92,246,0.35) !important;
+            border-radius: 12px !important;
+            overflow: hidden;
+        }}
+        [role="listbox"] [role="option"] {{
+            color: {TEXT} !important;
+            font-size: 13px !important;
+        }}
+        [role="listbox"] [role="option"][aria-selected="true"],
+        [role="listbox"] [role="option"]:hover {{
+            background: rgba(139,92,246,0.18) !important;
+        }}
         </style>
         """,
         unsafe_allow_html=True,

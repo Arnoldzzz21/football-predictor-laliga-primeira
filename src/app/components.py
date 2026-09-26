@@ -6,6 +6,9 @@ probabilidad, chips de resultados, KPIs, mapa de calor, tabla proyectada).
 Cada funcion regresa un string HTML pensado para st.markdown(html,
 unsafe_allow_html=True) -- no son componentes nativos de Streamlit porque
 el look bespoke del mockup no se logra con los widgets por defecto.
+
+Todo el texto visible en la app (lo que regresan estas funciones) va en
+ingles -- los comentarios/docstrings del codigo se quedan en espanol.
 """
 
 from __future__ import annotations
@@ -46,15 +49,32 @@ def _score_block(iso2: str, home_txt: str, away_txt: str, color: str, size: int 
     """.strip()
 
 
+def _confidence_badge(confidence: float) -> str:
+    """Badge 'el modelo le pego en X%' -- probabilidad que el modelo le dio
+    al resultado 1X2 que realmente ocurrio (ver data_access.outcome_confidence).
+    Color en 3 niveles para que se lea de un vistazo que tan bien lo vio el
+    modelo: verde = alta confianza, morado = razonable, rojo = sorpresa."""
+    pct = confidence * 100
+    if confidence >= 0.45:
+        bg, color = "rgba(61,220,151,0.16)", GREEN
+    elif confidence >= 0.30:
+        bg, color = "rgba(139,92,246,0.18)", ACCENT_LIGHT
+    else:
+        bg, color = "rgba(255,92,122,0.14)", RED
+    return (f'<span class="fp-badge" style="background:{bg}; color:{color};" '
+            f'title="Probability the model gave to this outcome before kickoff">'
+            f'🎯 {pct:.0f}%</span>')
+
+
 def played_match_row(home_name: str, away_name: str, iso2: str,
                       proj_h: int, proj_a: int, final_h: int, final_a: int,
-                      matchday: int) -> str:
+                      matchday: int, confidence: float) -> str:
     return f"""
     <div style="display:flex; gap:20px; margin-bottom:20px;">
       <div class="fp-card fp-card-proj" style="flex:1;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-          <span class="fp-eyebrow">Proyectado</span>
-          <span class="fp-badge" style="background:rgba(148,142,168,0.14); color:{MUTED_DIM};">Pre-partido</span>
+          <span class="fp-eyebrow">Projected</span>
+          <span class="fp-badge" style="background:rgba(148,142,168,0.14); color:{MUTED_DIM};">Pre-match</span>
         </div>
         <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
           <div style="flex:1;"><div style="font-size:15px; font-weight:600;">{home_name}</div></div>
@@ -64,8 +84,11 @@ def played_match_row(home_name: str, away_name: str, iso2: str,
       </div>
       <div class="fp-card fp-card-final" style="flex:1;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-          <span class="fp-eyebrow">Resultado final</span>
-          <span class="fp-badge" style="background:rgba(139,92,246,0.18); color:{ACCENT_LIGHT};">Final · J{matchday}</span>
+          <span class="fp-eyebrow">Final result</span>
+          <div style="display:flex; gap:8px; align-items:center;">
+            {_confidence_badge(confidence)}
+            <span class="fp-badge" style="background:rgba(139,92,246,0.18); color:{ACCENT_LIGHT};">Final · MD{matchday}</span>
+          </div>
         </div>
         <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
           <div style="flex:1;"><div style="font-size:15px; font-weight:600;">{home_name}</div></div>
@@ -93,15 +116,15 @@ def upcoming_match_card(home_name: str, away_name: str, iso2: str,
 
     live_note = (
         f'<div style="font-size:11px; color:{MUTED_DIM}; margin-top:4px;">'
-        f'Proyección calculada en vivo con las calificaciones más recientes '
-        f'(el pipeline de predicciones aún no corrió esta jornada)</div>'
+        f'Live projection using the latest team ratings '
+        f'(the predictions pipeline hasn’t run for this matchday yet)</div>'
     ) if live_projection else ""
 
     return f"""
     <div class="fp-card" style="border:1px solid rgba(139,92,246,0.3); margin-bottom:20px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
-        <span class="fp-eyebrow">Proyección del modelo</span>
-        <span class="fp-badge" style="background:rgba(139,92,246,0.18); color:{ACCENT_LIGHT};">Próximo · J{matchday}</span>
+        <span class="fp-eyebrow">Model projection</span>
+        <span class="fp-badge" style="background:rgba(139,92,246,0.18); color:{ACCENT_LIGHT};">Upcoming · MD{matchday}</span>
       </div>
       <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:18px;">
         <div style="flex:1;"><div style="font-size:16px; font-weight:600;">{home_name}</div></div>
@@ -116,11 +139,11 @@ def upcoming_match_card(home_name: str, away_name: str, iso2: str,
           <div style="width:{p_away*100:.1f}%; background:{RED};"></div>
         </div>
         <div style="display:flex; justify-content:space-between; font-size:12px; color:{MUTED}; margin-top:8px;">
-          <span>Local {p_home*100:.0f}%</span><span>Empate {p_draw*100:.0f}%</span><span>Visita {p_away*100:.0f}%</span>
+          <span>Home {p_home*100:.0f}%</span><span>Draw {p_draw*100:.0f}%</span><span>Away {p_away*100:.0f}%</span>
         </div>
       </div>
       <div style="margin-top:18px; display:flex; flex-direction:column; gap:10px;">
-        <span class="fp-eyebrow">Resultados más probables</span>
+        <span class="fp-eyebrow">Most likely scorelines</span>
         <div style="display:flex; gap:12px; flex-wrap:wrap;">{chips}</div>
       </div>
     </div>
@@ -129,7 +152,7 @@ def upcoming_match_card(home_name: str, away_name: str, iso2: str,
 
 def accuracy_trend_svg(matchdays: list[int], values_pct: list[float]) -> str:
     if not matchdays:
-        return f'<div style="font-size:12px; color:{MUTED};">Todavía no hay jornadas jugadas con proyección para comparar.</div>'
+        return f'<div style="font-size:12px; color:{MUTED};">No played matchdays with a projection to compare yet.</div>'
     w, h, pad = 300, 90, 8
     n = len(matchdays)
     xs = [pad + i * (w - 2 * pad) / max(n - 1, 1) for i in range(n)]
@@ -150,7 +173,7 @@ def accuracy_trend_svg(matchdays: list[int], values_pct: list[float]) -> str:
       <circle cx="{last_x:.1f}" cy="{last_y:.1f}" r="4" fill="{ACCENT_LIGHT}"/>
     </svg>
     <div style="display:flex; justify-content:space-between; font-size:11px; color:{MUTED_DIM};">
-      <span>J{matchdays[0]}</span><span>J{matchdays[-1]}</span>
+      <span>MD{matchdays[0]}</span><span>MD{matchdays[-1]}</span>
     </div>
     """
 
@@ -199,7 +222,7 @@ def heat_pitch_svg(home_label: str, away_label: str, home_intensity: float, away
       <ellipse cx="228" cy="95" rx="{r1:.0f}" ry="{r1*0.7:.0f}" fill="url(#fpHeat1)"/>
       <ellipse cx="72" cy="95" rx="{r2:.0f}" ry="{r2*0.7:.0f}" fill="url(#fpHeat2)"/>
     </svg>
-    <div style="font-size:11px; color:{MUTED_DIM};">{home_label} (izq.) vs. {away_label} (der.) — intensidad ofensiva proyectada</div>
+    <div style="font-size:11px; color:{MUTED_DIM};">{home_label} (left) vs. {away_label} (right) — projected attacking intensity</div>
     """
 
 
