@@ -192,40 +192,6 @@ def kpi_bars(values: list[float], labels: list[str]) -> str:
     """
 
 
-def heat_pitch_svg(home_label: str, away_label: str, home_intensity: float, away_intensity: float) -> str:
-    """home_intensity/away_intensity: 0-1, percentil de la fuerza de ataque
-    (columna `attack` de team_ratings) frente al resto de la liga. Es una
-    lectura ilustrativa del ataque proyectado por zona, no una posicion de
-    jugadores real (el pipeline no captura tracking data)."""
-    r1 = 30 + 30 * away_intensity
-    r2 = 24 + 26 * home_intensity
-    o1 = 0.35 + 0.5 * away_intensity
-    o2 = 0.3 + 0.45 * home_intensity
-    return f"""
-    <svg width="100%" height="150" viewBox="0 0 300 190">
-      <defs>
-        <radialGradient id="fpHeat1" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stop-color="{ACCENT_LIGHT}" stop-opacity="{o1:.2f}"/>
-          <stop offset="100%" stop-color="{ACCENT_LIGHT}" stop-opacity="0"/>
-        </radialGradient>
-        <radialGradient id="fpHeat2" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stop-color="{ACCENT}" stop-opacity="{o2:.2f}"/>
-          <stop offset="100%" stop-color="{ACCENT}" stop-opacity="0"/>
-        </radialGradient>
-      </defs>
-      <rect x="4" y="4" width="292" height="182" rx="6" fill="#0E0A18" stroke="rgba(255,255,255,0.22)" stroke-width="1.5"/>
-      <line x1="150" y1="4" x2="150" y2="186" stroke="rgba(255,255,255,0.18)" stroke-width="1.5"/>
-      <circle cx="150" cy="95" r="26" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1.5"/>
-      <circle cx="150" cy="95" r="2" fill="rgba(255,255,255,0.3)"/>
-      <rect x="4" y="55" width="46" height="80" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1.5"/>
-      <rect x="250" y="55" width="46" height="80" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1.5"/>
-      <ellipse cx="228" cy="95" rx="{r1:.0f}" ry="{r1*0.7:.0f}" fill="url(#fpHeat1)"/>
-      <ellipse cx="72" cy="95" rx="{r2:.0f}" ry="{r2*0.7:.0f}" fill="url(#fpHeat2)"/>
-    </svg>
-    <div style="font-size:11px; color:{MUTED_DIM};">{home_label} (left) vs. {away_label} (right) — projected attacking intensity</div>
-    """
-
-
 def top_table_html(rows: list[dict]) -> str:
     """rows: [{'pos', 'name', 'avg_position', 'prob_champions_league'}, ...]"""
     body = ""
