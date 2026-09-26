@@ -88,16 +88,35 @@ with f_team:
         )
 team_key = None if team_filter == "All" else team_filter
 
+# Navegacion de jornada: botones Prev/Next ademas del selectbox, para no
+# depender de hacer scroll (o escribir a buscar) dentro de una lista de 38
+# opciones -- el usuario reporto que el selectbox solo no era intuitivo
+# para moverse por jornadas lejos de la actual.
+md_key = f"md_select_{league}"
+if md_key not in st.session_state or st.session_state[md_key] not in all_mds:
+    st.session_state[md_key] = default_md
+
 with f_md:
     with st.container(border=True):
         _filter_label("MATCHDAY", RED)
         if all_mds:
-            selected_md = st.selectbox(
-                "Matchday", options=all_mds,
-                index=all_mds.index(default_md),
-                format_func=lambda m: f"Matchday {m}",
-                label_visibility="collapsed",
-            )
+            current_idx = all_mds.index(st.session_state[md_key])
+            nav_prev, nav_mid, nav_next = st.columns([1, 5, 1], gap="small")
+            with nav_prev:
+                if st.button("‹", key=f"{md_key}_prev", use_container_width=True,
+                             disabled=(current_idx == 0), help="Previous matchday"):
+                    st.session_state[md_key] = all_mds[current_idx - 1]
+            with nav_next:
+                if st.button("›", key=f"{md_key}_next", use_container_width=True,
+                             disabled=(current_idx == len(all_mds) - 1), help="Next matchday"):
+                    st.session_state[md_key] = all_mds[current_idx + 1]
+            with nav_mid:
+                selected_md = st.selectbox(
+                    "Matchday", options=all_mds,
+                    format_func=lambda m: f"Matchday {m}",
+                    label_visibility="collapsed",
+                    key=md_key,
+                )
         else:
             selected_md = None
             st.selectbox("Matchday", options=["—"], label_visibility="collapsed", disabled=True)

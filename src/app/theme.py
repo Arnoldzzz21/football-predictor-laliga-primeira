@@ -135,6 +135,25 @@ def inject() -> None:
             background: rgba(139,92,246,0.18) !important;
         }}
 
+        /* botones Prev/Next del selector de jornada (dentro de la
+           tarjeta MATCHDAY) -- mismo tratamiento oscuro/morado que el
+           selectbox, en vez del boton claro por defecto de Streamlit */
+        div[data-testid="stVerticalBlockBorderWrapper"] div[data-testid="stButton"] button {{
+            background: {CARD_BG} !important;
+            border: 1px solid {BORDER_SOFT} !important;
+            color: {TEXT} !important;
+            border-radius: 10px !important;
+            min-height: 2.35rem;
+            padding: 0 !important;
+        }}
+        div[data-testid="stVerticalBlockBorderWrapper"] div[data-testid="stButton"] button:hover:not(:disabled) {{
+            border-color: rgba(139,92,246,0.55) !important;
+            color: {ACCENT_LIGHT} !important;
+        }}
+        div[data-testid="stVerticalBlockBorderWrapper"] div[data-testid="stButton"] button:disabled {{
+            opacity: 0.3;
+        }}
+
         .fp-footer {{
             text-align: center; font-size: 12px; color: {MUTED_DIM};
             margin-top: 32px; padding-top: 18px;
