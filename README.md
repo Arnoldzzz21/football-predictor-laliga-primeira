@@ -1,9 +1,6 @@
 # Football Predictor — LaLiga & Primeira Liga
 
-Plataforma predictiva de fútbol europeo (LaLiga EA Sports + Primeira Liga
-portuguesa), temporada 2026-2027, construida con Dixon-Coles (Poisson
-bivariado con decaimiento temporal) y simulación Monte Carlo (10,000
-simulaciones por partido) para proyectar resultados y la tabla final.
+Predictive platform for European football (LaLiga EA Sports + Portuguese Primeira Liga), 2026–2027 season, built using the Dixon-Coles model (bivariate Poisson with time decay) and Monte Carlo simulation (10,000 simulations per match) to project results and the final standings.
 
 ## App
 
@@ -12,17 +9,17 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-- Marcador proyectado vs. resultado real por jornada jugada.
-- Próxima jornada: marcador proyectado, probabilidad 1X2 y los 3
-  resultados exactos más probables.
-- Precisión histórica del modelo, mapa de calor ofensivo y tabla
-  proyectada (Top 4).
+- Projected score vs. actual result per matchday played.
+- Next matchday: projected score, 1X2 probability, and the 3
+  most likely exact scores.
+- Model's historical accuracy, attacking heat map, and projected
+  table (Top 4).
 
 ## Pipeline / Data Lake
 
-Data Lake local en Parquet (Bronze → Silver → Gold), particionado por
-liga/temporada bajo `data/`. Ver los notebooks en la raíz para cada etapa
-(extracción, resolución de equipos, ratings Dixon-Coles, predicciones,
-simulaciones de temporada).
 
-Banderas de país en vez de escudos de club, por tema de copyright.
+Local Parquet Data Lake (Bronze → Silver → Gold), partitioned by
+league/season under `data/`. See the notebooks in the root directory for each stage
+(extraction, team resolution, Dixon-Coles ratings, predictions,
+season simulations).
+
