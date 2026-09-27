@@ -140,14 +140,32 @@ if selected_md is None:
     st.info("No matches loaded yet for this league/season.")
 else:
     day_matches = _matches_for(selected_md)
-    is_played = not day_matches.empty and (day_matches.status == "FINISHED").all()
+    finished_count = int((day_matches.status == "FINISHED").sum())
+    has_played = finished_count > 0
+    all_played = not day_matches.empty and finished_count == len(day_matches)
 
-    if is_played:
-        st.markdown(f"##### Matchday {selected_md} · {LEAGUE_LABELS[league]} — Played")
-        st.caption("Pre-match projection vs. final result")
-        for _, m in day_matches.iterrows():
-            proj = match_projection(m.home_team_key, m.away_team_key, selected_md,
-                                     predictions, snap, mu, gamma, rho)
+    # Estado por jornada basado en si al menos un partido ya se jugo (no si
+    # TODOS se jugaron): una jornada con un partido aplazado/reprogramado
+    # (status POSTPONED/TIMED) sigue contando como jugada para los que ya
+    # tienen resultado -- cada partido se renderiza segun su propio status,
+    # no segun el status agregado de la jornada.
+    if has_played:
+        header_label = "Played" if all_played else f"In progress · {finished_count}/{len(day_matches)} played"
+        st.markdown(f"##### Matchday {selected_md} · {LEAGUE_LABELS[league]} — {header_label}")
+        st.caption("Pre-match projection vs. final result" if all_played
+                   else "Pre-match projection vs. final result — some matches are still pending (postponed/rescheduled)")
+    else:
+        st.markdown(f"##### Matchday {selected_md} · {LEAGUE_LABELS[league]} — Upcoming")
+        if day_matches.empty:
+            st.markdown(
+                '<div style="font-size:12px; color:#8892B0;">No matches for this team in this matchday.</div>',
+                unsafe_allow_html=True,
+            )
+
+    for _, m in day_matches.iterrows():
+        proj = match_projection(m.home_team_key, m.away_team_key, selected_md,
+                                 predictions, snap, mu, gamma, rho)
+        if m.status == "FINISHED":
             confidence = outcome_confidence(proj["p_home"], proj["p_draw"], proj["p_away"], m.result)
             st.markdown(
                 C.played_match_row(
@@ -160,16 +178,7 @@ else:
                 ),
                 unsafe_allow_html=True,
             )
-    else:
-        st.markdown(f"##### Matchday {selected_md} · {LEAGUE_LABELS[league]} — Upcoming")
-        if day_matches.empty:
-            st.markdown(
-                '<div style="font-size:12px; color:#8892B0;">No matches for this team in this matchday.</div>',
-                unsafe_allow_html=True,
-            )
-        for _, m in day_matches.iterrows():
-            proj = match_projection(m.home_team_key, m.away_team_key, selected_md,
-                                     predictions, snap, mu, gamma, rho)
+        else:
             st.markdown(
                 C.upcoming_match_card(
                     name_of.get(m.home_team_key, m.home_team_key),
