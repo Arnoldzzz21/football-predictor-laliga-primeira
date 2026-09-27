@@ -126,11 +126,16 @@ def match_projection(home_key: str, away_key: str, matchday: int,
     }
 
 
-def outcome_confidence(p_home: float, p_draw: float, p_away: float, result: str) -> float:
-    """Probabilidad (0-1) que el modelo le dio al resultado 1X2 (H/D/A) que
-    realmente ocurrio en el partido -- el 'le pego en X%' que se muestra
-    junto al resultado final en la app."""
-    return {"H": p_home, "D": p_draw, "A": p_away}.get(result, 0.0)
+def scoreline_accuracy(proj_h: int, proj_a: int, final_h: int, final_a: int,
+                        penalty_per_goal: float = 20.0) -> float:
+    """Que tan cerca estuvo el marcador exacto proyectado (proj_h-proj_a) del
+    resultado final (final_h-final_a) -- el badge que se muestra junto al
+    resultado final en la app. 100% si el marcador coincide exacto; baja
+    `penalty_per_goal` puntos porcentuales por cada gol de diferencia total
+    (|home| + |away|), sin bajar de 0. Con el default de 20 pts/gol: mismo
+    marcador -> 100%, un gol de diferencia -> 80%, dos -> 60%, etc."""
+    diff = abs(proj_h - final_h) + abs(proj_a - final_a)
+    return max(0.0, 100.0 - penalty_per_goal * diff)
 
 
 DRAW_MARGIN = 0.06

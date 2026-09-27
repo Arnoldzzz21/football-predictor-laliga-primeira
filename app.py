@@ -25,7 +25,7 @@ from src.app.data_access import (
     load_match_predictions, load_season_simulations,
     team_name_map, active_season_teams,
     latest_ratings_snapshot, global_params, match_projection,
-    matchday_status, matchday_accuracy_trend, outcome_confidence,
+    matchday_status, matchday_accuracy_trend, scoreline_accuracy,
     matchday_brier_score,
 )
 
@@ -166,7 +166,10 @@ else:
         proj = match_projection(m.home_team_key, m.away_team_key, selected_md,
                                  predictions, snap, mu, gamma, rho)
         if m.status == "FINISHED":
-            confidence = outcome_confidence(proj["p_home"], proj["p_draw"], proj["p_away"], m.result)
+            accuracy_pct = scoreline_accuracy(
+                proj["projected_home"], proj["projected_away"],
+                int(m.home_score), int(m.away_score),
+            )
             st.markdown(
                 C.played_match_row(
                     name_of.get(m.home_team_key, m.home_team_key),
@@ -174,7 +177,7 @@ else:
                     iso2,
                     proj["projected_home"], proj["projected_away"],
                     int(m.home_score), int(m.away_score),
-                    selected_md, confidence,
+                    selected_md, accuracy_pct,
                 ),
                 unsafe_allow_html=True,
             )

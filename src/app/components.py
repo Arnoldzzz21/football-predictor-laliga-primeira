@@ -49,26 +49,30 @@ def _score_block(iso2: str, home_txt: str, away_txt: str, color: str, size: int 
     """.strip()
 
 
-def _confidence_badge(confidence: float) -> str:
-    """Badge 'el modelo le pego en X%' -- probabilidad que el modelo le dio
-    al resultado 1X2 que realmente ocurrio (ver data_access.outcome_confidence).
-    Color en 3 niveles para que se lea de un vistazo que tan bien lo vio el
-    modelo: verde = alta confianza, morado = razonable, rojo = sorpresa."""
-    pct = confidence * 100
-    if confidence >= 0.45:
+def _accuracy_badge(accuracy_pct: float) -> str:
+    """Badge de que tan cerca estuvo el marcador exacto proyectado del
+    resultado final (ver data_access.scoreline_accuracy). Marcador exacto
+    (100%) se muestra como un check en vez de un numero. Color en 3 niveles
+    para que se lea de un vistazo: verde = muy cerca, morado = razonable,
+    rojo = lejos."""
+    if accuracy_pct >= 100:
+        return (f'<span class="fp-badge" style="background:rgba(61,220,151,0.16); color:{GREEN};" '
+                f'title="The projected scoreline matched the final result exactly">'
+                f'✓ Exact</span>')
+    if accuracy_pct >= 80:
         bg, color = "rgba(61,220,151,0.16)", GREEN
-    elif confidence >= 0.30:
+    elif accuracy_pct >= 40:
         bg, color = "rgba(139,92,246,0.18)", ACCENT_LIGHT
     else:
         bg, color = "rgba(255,92,122,0.14)", RED
     return (f'<span class="fp-badge" style="background:{bg}; color:{color};" '
-            f'title="Probability the model gave to this outcome before kickoff">'
-            f'🎯 {pct:.0f}%</span>')
+            f'title="How close the projected scoreline was to the final result">'
+            f'🎯 {accuracy_pct:.0f}%</span>')
 
 
 def played_match_row(home_name: str, away_name: str, iso2: str,
                       proj_h: int, proj_a: int, final_h: int, final_a: int,
-                      matchday: int, confidence: float) -> str:
+                      matchday: int, accuracy_pct: float) -> str:
     return f"""
     <div style="display:flex; gap:20px; margin-bottom:20px;">
       <div class="fp-card fp-card-proj" style="flex:1;">
@@ -86,7 +90,7 @@ def played_match_row(home_name: str, away_name: str, iso2: str,
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
           <span class="fp-eyebrow">Final result</span>
           <div style="display:flex; gap:8px; align-items:center;">
-            {_confidence_badge(confidence)}
+            {_accuracy_badge(accuracy_pct)}
             <span class="fp-badge" style="background:rgba(139,92,246,0.18); color:{ACCENT_LIGHT};">Final · MD{matchday}</span>
           </div>
         </div>
