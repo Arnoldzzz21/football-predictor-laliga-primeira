@@ -26,6 +26,7 @@ from src.app.data_access import (
     team_name_map, active_season_teams,
     latest_ratings_snapshot, global_params, match_projection,
     matchday_status, matchday_accuracy_trend, outcome_confidence,
+    matchday_brier_score,
 )
 
 st.set_page_config(page_title="Football Predictor", page_icon="⚽", layout="wide")
@@ -197,8 +198,21 @@ with col2:
     st.markdown('<span style="font-size:12px; color:#8892B0;">Model performance</span>', unsafe_allow_html=True)
     overall_acc = np.mean(acc) if acc else 0.0
     n_sims = int(simulations.n_simulations.iloc[0]) if not simulations.empty else 0
-    kpi_values = [overall_acc, overall_acc * 0.4, float(snap["attack"].std()), n_sims / 100]
-    kpi_labels = [f"{overall_acc:.0f}%", "exact score ↓", f"attack σ {snap['attack'].std():.2f}", f"{n_sims:,} sims"]
+    # Brier score (0-0.667, lower = better calibrated) se muestra como
+    # "skill vs. random" (0-100%, mayor = mejor) para que la barra sea
+    # comparable a las demas -- la etiqueta debajo muestra el Brier real.
+    # Reemplaza al viejo "exact score" (era overall_acc*0.4, un numero
+    # inventado, no una metrica real).
+    brier = matchday_brier_score(matches, predictions, team_key)
+    uniform_brier = 2 / 3
+    brier_skill_pct = max(0.0, (uniform_brier - brier) / uniform_brier * 100) if brier is not None else 0.0
+    kpi_values = [overall_acc, brier_skill_pct, float(snap["attack"].std()) * 100, n_sims / 100]
+    kpi_labels = [
+        f"{overall_acc:.0f}% 1X2",
+        f"Brier {brier:.3f}" if brier is not None else "Brier n/a",
+        f"attack σ {snap['attack'].std():.2f}",
+        f"{n_sims:,} sims",
+    ]
     st.markdown(C.kpi_bars(kpi_values, kpi_labels), unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
