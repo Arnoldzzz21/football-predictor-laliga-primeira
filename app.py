@@ -196,15 +196,16 @@ st.markdown("##### Model statistics")
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    st.markdown('<div class="fp-card">', unsafe_allow_html=True)
-    st.markdown('<span style="font-size:12px; color:#8892B0;">1X2 accuracy by matchday</span>', unsafe_allow_html=True)
     mds, acc = matchday_accuracy_trend(matches, predictions, team_key)
-    st.markdown(C.accuracy_trend_svg(mds, acc), unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="fp-card">'
+        '<span style="font-size:12px; color:#8892B0;">1X2 accuracy by matchday</span>'
+        + C.accuracy_trend_svg(mds, acc) +
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
 with col2:
-    st.markdown('<div class="fp-card">', unsafe_allow_html=True)
-    st.markdown('<span style="font-size:12px; color:#8892B0;">Model performance</span>', unsafe_allow_html=True)
     overall_acc = np.mean(acc) if acc else 0.0
     n_sims = int(simulations.n_simulations.iloc[0]) if not simulations.empty else 0
     # Brier score (0-0.667, lower = better calibrated) se muestra como
@@ -222,20 +223,28 @@ with col2:
         f"attack σ {snap['attack'].std():.2f}",
         f"{n_sims:,} sims",
     ]
-    st.markdown(C.kpi_bars(kpi_values, kpi_labels), unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="fp-card">'
+        '<span style="font-size:12px; color:#8892B0;">Model performance</span>'
+        + C.kpi_bars(kpi_values, kpi_labels) +
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
 with col3:
-    st.markdown('<div class="fp-card">', unsafe_allow_html=True)
-    st.markdown('<span style="font-size:12px; color:#8892B0;">Projected table (Top 4)</span>', unsafe_allow_html=True)
     top4 = simulations.sort_values("avg_position").head(4).copy()
     rows = [
         {"pos": i + 1, "name": name_of.get(r.team_key, r.team_key),
          "avg_position": r.avg_position, "prob_champions_league": r.prob_champions_league}
         for i, r in enumerate(top4.itertuples())
     ]
-    st.markdown(C.top_table_html(rows), unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="fp-card">'
+        '<span style="font-size:12px; color:#8892B0;">Projected table (Top 4)</span>'
+        + C.top_table_html(rows) +
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
 # ------------------------------------------------------------------ Footer --
 st.markdown('<div class="fp-footer">Built by Arnoldo Cuéllar</div>', unsafe_allow_html=True)
