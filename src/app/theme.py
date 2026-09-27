@@ -60,7 +60,7 @@ def inject() -> None:
             box-shadow: 0 0 24px rgba(139,92,246,0.14);
         }}
         .fp-card-proj {{
-            border: 1px dashed rgba(167,139,250,0.4);
+            border: 1px dashed rgba(196,181,255,0.45);
         }}
         .fp-badge {{
             font-size: 11px; padding: 4px 10px; border-radius: 999px;
