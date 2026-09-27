@@ -29,6 +29,15 @@ from src.utils.dixon_coles import score_matrix, outcome_probs
 LAKE_ROOT = Path("data")
 ACTIVE_SEASON = "2026-2027"
 
+# De momento la app solo expone la temporada activa en el slicer de Season
+# -- el Data Lake ya tiene Silver/Gold de 3 temporadas anteriores (usadas
+# como historico para entrenar el modelo), pero season_simulations (Monte
+# Carlo) solo existe para la temporada activa, asi que navegar temporadas
+# pasadas desde la UI dejaria la tabla proyectada rota. Cuando arranque
+# 2027-2028 esta lista pasa a tener 2 elementos y el slicer queda listo
+# para eso sin mas cambios.
+AVAILABLE_SEASONS = [ACTIVE_SEASON]
+
 LEAGUE_LABELS = {"laliga": "LaLiga EA Sports", "primeira_liga": "Primeira Liga"}
 LEAGUE_FLAG = {"laliga": "ES", "primeira_liga": "PT"}
 

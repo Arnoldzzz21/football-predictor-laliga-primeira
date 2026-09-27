@@ -18,9 +18,9 @@ import pandas as pd
 import streamlit as st
 
 from src.app import theme, components as C
-from src.app.theme import ACCENT_LIGHT, GREEN, RED
+from src.app.theme import ACCENT, ACCENT_LIGHT, GREEN, RED
 from src.app.data_access import (
-    LEAGUE_LABELS, LEAGUE_FLAG,
+    LEAGUE_LABELS, LEAGUE_FLAG, AVAILABLE_SEASONS,
     load_teams_master, load_matches, load_team_ratings,
     load_match_predictions, load_season_simulations,
     team_name_map, active_season_teams,
@@ -52,10 +52,20 @@ st.markdown(
 )
 
 # ------------------------------------------------------------- Filtros --
-# Las 3 tarjetas se llenan en orden de dependencia (liga -> datos de esa
-# liga -> equipo/jornada), pero cada `with` coloca su contenido en la
-# columna que le corresponde sin importar el orden de ejecucion.
-f_league, f_team, f_md = st.columns(3)
+# Las 4 tarjetas se llenan en orden de dependencia (season/liga -> datos de
+# esa season+liga -> equipo/jornada), pero cada `with` coloca su contenido
+# en la columna que le corresponde sin importar el orden de ejecucion.
+f_season, f_league, f_team, f_md = st.columns(4)
+
+with f_season:
+    with st.container(border=True):
+        _filter_label("SEASON", ACCENT)
+        # Por ahora AVAILABLE_SEASONS solo trae la temporada activa (ver
+        # nota en data_access.py) -- el slicer ya queda listo para cuando
+        # arranque la proxima temporada, sin mas cambios en la UI.
+        season = st.selectbox(
+            "Season", options=AVAILABLE_SEASONS, label_visibility="collapsed",
+        )
 
 with f_league:
     with st.container(border=True):
@@ -65,10 +75,10 @@ with f_league:
             format_func=lambda k: LEAGUE_LABELS[k], label_visibility="collapsed",
         )
 
-matches = load_matches(league)
-ratings = load_team_ratings(league)
-predictions = load_match_predictions(league)
-simulations = load_season_simulations(league)
+matches = load_matches(league, season)
+ratings = load_team_ratings(league, season)
+predictions = load_match_predictions(league, season)
+simulations = load_season_simulations(league, season)
 name_of = team_name_map(teams_master, league)
 iso2 = LEAGUE_FLAG[league]
 
@@ -93,7 +103,7 @@ team_key = None if team_filter == "All" else team_filter
 # depender de hacer scroll (o escribir a buscar) dentro de una lista de 38
 # opciones -- el usuario reporto que el selectbox solo no era intuitivo
 # para moverse por jornadas lejos de la actual.
-md_key = f"md_select_{league}"
+md_key = f"md_select_{season}_{league}"
 if md_key not in st.session_state or st.session_state[md_key] not in all_mds:
     st.session_state[md_key] = default_md
 
