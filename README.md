@@ -41,4 +41,4 @@ season simulations).
 
 **Live app**
 
-View it here:[football-predictor-arnoldo.streamlit.app](https://football-predictor-arnoldo.streamlit.app/)
+View it here: [football-predictor-arnoldo.streamlit.app](https://football-predictor-arnoldo.streamlit.app/)
