@@ -242,7 +242,7 @@ with col_kpi:
         },
         {
             "value": f"{goal_err:.1f}" if goal_err is not None else "n/a",
-            "label": "Avg goal error",
+            "label": "Avg goals",
             "quality": max(0.0, 1 - goal_err / GOAL_ERR_CEILING) if goal_err is not None else None,
         },
         {

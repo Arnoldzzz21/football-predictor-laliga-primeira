@@ -190,7 +190,7 @@ def kpi_tiles(tiles: list[dict]) -> str:
     for t in tiles:
         color = _quality_color(t["quality"]) if t.get("quality") is not None else TEXT
         cells += (
-            f'<div style="min-width:0;">'
+            f'<div style="min-width:0; text-align:center;">'
             f'<div class="mono" style="font-size:22px; font-weight:700; color:{color};">{t["value"]}</div>'
             f'<div style="font-size:11px; color:{MUTED}; margin-top:2px;">{t["label"]}</div>'
             f'</div>'
