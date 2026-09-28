@@ -25,7 +25,7 @@ from src.app.data_access import (
     team_name_map, active_season_teams,
     latest_ratings_snapshot, global_params, match_projection,
     matchday_status, matchday_accuracy_trend, scoreline_accuracy,
-    matchday_rps_score, avg_goal_error,
+    matchday_rps_score, avg_goal_error, avg_prob_on_actual,
 )
 
 st.set_page_config(page_title="Football Predictor", page_icon="⚽", layout="wide")
@@ -215,13 +215,20 @@ st.markdown("##### Model statistics")
 col_kpi, col_top4 = st.columns([2, 1])
 
 with col_kpi:
-    mds, acc = matchday_accuracy_trend(matches, predictions, team_key)
-    last_acc = acc[-1] if acc else None
-    last_md_played = mds[-1] if mds else None
+    # Los 4 KPIs se calculan solo sobre los partidos de la JORNADA
+    # seleccionada en el filtro MATCHDAY (no sobre toda la temporada) --
+    # asi la seccion reacciona al filtro igual que las tarjetas de
+    # partidos de arriba. Si la jornada elegida todavia no se jugo
+    # (ningun partido FINISHED), las funciones de mas abajo ya devuelven
+    # None/listas vacias con este subset y las tarjetas muestran "n/a".
+    stats_matches = matches[matches.matchday == selected_md] if selected_md is not None else matches.iloc[0:0]
 
-    rps = matchday_rps_score(matches, predictions, team_key)
-    goal_err = avg_goal_error(matches, predictions, team_key)
-    n_sims = int(simulations.n_simulations.iloc[0]) if not simulations.empty else 0
+    mds, acc = matchday_accuracy_trend(stats_matches, predictions, team_key)
+    md_acc = acc[0] if acc else None
+
+    rps = matchday_rps_score(stats_matches, predictions, team_key)
+    goal_err = avg_goal_error(stats_matches, predictions, team_key)
+    prob_actual = avg_prob_on_actual(stats_matches, predictions, team_key)
 
     # Techo usado solo para colorear el KPI de error de goles (0 goles de
     # error -> quality 1/verde, GOAL_ERR_CEILING+ goles de error -> quality
@@ -230,9 +237,9 @@ with col_kpi:
 
     tiles = [
         {
-            "value": f"{last_acc:.0f}%" if last_acc is not None else "n/a",
-            "label": f"1X2 accuracy · MD{last_md_played}" if last_md_played is not None else "1X2 accuracy",
-            "quality": (last_acc / 100) if last_acc is not None else None,
+            "value": f"{md_acc:.0f}%" if md_acc is not None else "n/a",
+            "label": f"1X2 accuracy · MD{selected_md}" if selected_md is not None else "1X2 accuracy",
+            "quality": (md_acc / 100) if md_acc is not None else None,
         },
         {
             "value": f"{rps:.3f}" if rps is not None else "n/a",
@@ -246,11 +253,10 @@ with col_kpi:
             "quality": max(0.0, 1 - goal_err / GOAL_ERR_CEILING) if goal_err is not None else None,
         },
         {
-            "value": f"{n_sims:,}",
-            "label": "Monte Carlo sims",
-            # Sin color de calidad: mas simulaciones no es "mejor modelo",
-            # solo dice cuanto computo se uso.
-            "quality": None,
+            "value": f"{prob_actual:.0f}%" if prob_actual is not None else "n/a",
+            "label": "Avg prob on actual result",
+            # Ya viene 0-100%, mientras mas alto mejor -- se usa directo.
+            "quality": (prob_actual / 100) if prob_actual is not None else None,
         },
     ]
     st.markdown(

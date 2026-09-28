@@ -261,6 +261,29 @@ def avg_goal_error(matches: pd.DataFrame, predictions: pd.DataFrame,
     return float((proj_total - real_total).abs().mean())
 
 
+def avg_prob_on_actual(matches: pd.DataFrame, predictions: pd.DataFrame,
+                        team_key: str | None = None) -> float | None:
+    """Probabilidad promedio (0-100%, mientras mas alto mejor) que el modelo
+    le dio al resultado que realmente ocurrio, sobre las jornadas jugadas.
+    Complementa al acierto 1X2 (binario: acerto o no el resultado MAS
+    probable) con que tan "convencido" estaba el modelo del resultado
+    correcto en promedio -- por ejemplo, un empate que el modelo daba al
+    35% (sin ser su favorito) cuenta distinto aca que uno al 5%, aunque
+    ambos casos sean un fallo en la metrica de acierto binario."""
+    finished = matches[matches.status == "FINISHED"].copy()
+    if team_key:
+        finished = finished[(finished.home_team_key == team_key) | (finished.away_team_key == team_key)]
+    merged = finished.merge(
+        predictions[["matchday", "home_team_key", "away_team_key", "p_home", "p_draw", "p_away"]],
+        on=["matchday", "home_team_key", "away_team_key"], how="inner",
+    )
+    if merged.empty:
+        return None
+    prob_map = {"H": "p_home", "D": "p_draw", "A": "p_away"}
+    prob_actual = merged.apply(lambda r: r[prob_map[r["result"]]], axis=1)
+    return float(prob_actual.mean() * 100)
+
+
 def matchday_status(matches: pd.DataFrame) -> tuple[int | None, int | None]:
     """(ultima jornada jugada, proxima jornada) para esta liga/temporada."""
     finished = matches[matches.status == "FINISHED"]
