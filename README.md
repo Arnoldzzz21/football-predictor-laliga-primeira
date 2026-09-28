@@ -2,8 +2,6 @@
 
 Predictive platform for European football (LaLiga EA Sports + Portuguese Primeira Liga), 2026–2027 season, built using the Dixon-Coles model (bivariate Poisson with time decay) and Monte Carlo simulation (10,000 simulations per match) to project results and the final standings.
 
-**Live app:** [football-predictor-arnoldo.streamlit.app](https://football-predictor-arnoldo.streamlit.app/)
-
 ## App
 
 ```
@@ -40,3 +38,5 @@ season simulations).
 - **Bronze:** raw match/team data as pulled from football-data.org.
 - **Silver:** team names resolved to canonical `team_key`, match result and goal difference added.
 - **Gold:** `team_ratings` (Dixon-Coles attack/defense per team/matchday), `match_predictions` (pre-match probabilities), `season_simulations` (Monte Carlo projections).
+
+**Live app:** [football-predictor-arnoldo.streamlit.app](https://football-predictor-arnoldo.streamlit.app/)
