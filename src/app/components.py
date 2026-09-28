@@ -14,7 +14,7 @@ ingles -- los comentarios/docstrings del codigo se quedan en espanol.
 from __future__ import annotations
 
 from src.app.theme import (
-    ACCENT, ACCENT_LIGHT, ACCENT_DEEP, ACCENT_SOFT, MUTED, MUTED_DIM,
+    ACCENT_LIGHT, MUTED, MUTED_DIM,
     GREEN, GRAY, RED, TEXT, FLAGS,
 )
 
@@ -154,46 +154,51 @@ def upcoming_match_card(home_name: str, away_name: str, iso2: str,
     """
 
 
-def accuracy_trend_svg(matchdays: list[int], values_pct: list[float]) -> str:
-    if not matchdays:
-        return f'<div style="font-size:12px; color:{MUTED};">No played matchdays with a projection to compare yet.</div>'
-    w, h, pad = 300, 90, 8
-    n = len(matchdays)
-    xs = [pad + i * (w - 2 * pad) / max(n - 1, 1) for i in range(n)]
-    ys = [h - pad - (v / 100) * (h - 2 * pad) for v in values_pct]
-    poly = " ".join(f"{x:.1f},{y:.1f}" for x, y in zip(xs, ys))
-    area = poly + f" {xs[-1]:.1f},{h} {xs[0]:.1f},{h}"
-    last_x, last_y = xs[-1], ys[-1]
-    return f"""
-    <svg width="100%" height="{h}" viewBox="0 0 {w} {h}" preserveAspectRatio="none">
-      <defs>
-        <linearGradient id="fpArea" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="{ACCENT}" stop-opacity="0.35"/>
-          <stop offset="100%" stop-color="{ACCENT}" stop-opacity="0"/>
-        </linearGradient>
-      </defs>
-      <polygon points="{area}" fill="url(#fpArea)"/>
-      <polyline points="{poly}" fill="none" stroke="{ACCENT}" stroke-width="3"/>
-      <circle cx="{last_x:.1f}" cy="{last_y:.1f}" r="4" fill="{ACCENT_LIGHT}"/>
-    </svg>
-    <div style="display:flex; justify-content:space-between; font-size:11px; color:{MUTED_DIM};">
-      <span>MD{matchdays[0]}</span><span>MD{matchdays[-1]}</span>
-    </div>
-    """
+def _quality_color(quality: float) -> str:
+    """Interpola en RGB entre RED (quality=0, peor) y GREEN (quality=1,
+    mejor) -- mismos tokens de color que ya usa el resto de la app (el
+    badge de scoreline_accuracy, la barra Home/Draw/Away), para que las
+    tarjetas KPI hablen el mismo idioma visual. 'quality' ya viene
+    normalizado 0-1 desde data_access.py/app.py (cada metrica define su
+    propio sentido de "mejor" antes de llegar aqui -- ej. RPS y el error de
+    goles son mejor mientras mas bajos, por eso su quality = 1 - valor
+    normalizado, no el valor crudo)."""
+    q = max(0.0, min(1.0, quality))
+    red, green = (0xFF, 0x5C, 0x7A), (0x3D, 0xDC, 0x97)
+    r, g, b = (round(red[i] + (green[i] - red[i]) * q) for i in range(3))
+    return f"#{r:02X}{g:02X}{b:02X}"
 
 
-def kpi_bars(values: list[float], labels: list[str]) -> str:
-    max_v = max(values) or 1
-    colors = [ACCENT_DEEP, ACCENT, ACCENT_SOFT, ACCENT_LIGHT]
-    bars = ""
-    for i, v in enumerate(values):
-        pct = max(6, v / max_v * 100)
-        bars += f'<div style="width:22px; height:{pct:.0f}%; background:{colors[i % 4]}; border-radius:4px 4px 0 0;"></div>'
-    label_row = "".join(f'<span>{l}</span>' for l in labels)
-    return f"""
-    <div style="display:flex; align-items:flex-end; gap:14px; height:70px;">{bars}</div>
-    <div style="display:flex; justify-content:space-between; font-size:11px; color:#C7CEE3; margin-top:6px;">{label_row}</div>
-    """
+def kpi_tiles(tiles: list[dict]) -> str:
+    """tiles: [{'value': str, 'label': str, 'quality': float | None}, ...].
+
+    Reemplaza al viejo kpi_bars(): ahi 4 metricas de distinta unidad y
+    escala (% de acierto, Brier score, desviacion de rating, conteo de
+    simulaciones) se forzaban a una barra con altura relativa, sugiriendo
+    una comparacion de magnitud entre ellas que no existia -- un
+    anti-patron de dataviz (mezclar unidades en un solo eje). Aqui cada
+    metrica es su propia tarjeta con su numero grande, sin eje ni barra
+    compartida.
+
+    'quality' (0 a 1, ya normalizado por quien llama) colorea el numero en
+    un degradado rojo->verde segun que tan bueno es ESE valor para esa
+    metrica especifica. 'quality'=None deja el numero en el color de texto
+    normal, para metricas que no son un indicador de calidad (ej. el
+    conteo de simulaciones Monte Carlo: mas simulaciones no es "mejor
+    modelo", solo dice cuanto computo se uso)."""
+    cells = ""
+    for t in tiles:
+        color = _quality_color(t["quality"]) if t.get("quality") is not None else TEXT
+        cells += (
+            f'<div style="min-width:0;">'
+            f'<div class="mono" style="font-size:22px; font-weight:700; color:{color};">{t["value"]}</div>'
+            f'<div style="font-size:11px; color:{MUTED}; margin-top:2px;">{t["label"]}</div>'
+            f'</div>'
+        )
+    return (
+        f'<div style="display:grid; grid-template-columns: repeat(2, 1fr); '
+        f'gap:18px 14px; margin-top:10px;">{cells}</div>'
+    )
 
 
 def top_table_html(rows: list[dict]) -> str:

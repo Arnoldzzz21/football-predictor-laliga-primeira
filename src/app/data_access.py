@@ -198,6 +198,69 @@ def matchday_brier_score(matches: pd.DataFrame, predictions: pd.DataFrame,
     return float(np.mean(np.sum((probs - onehot) ** 2, axis=1)))
 
 
+def matchday_rps_score(matches: pd.DataFrame, predictions: pd.DataFrame,
+                        team_key: str | None = None) -> float | None:
+    """Ranked Probability Score promedio (0 a 1, mientras mas bajo mejor)
+    sobre las jornadas ya jugadas. A diferencia del Brier score (que trata
+    Home/Draw/Away como categorias sin relacion entre si), RPS respeta el
+    orden natural de los 3 resultados -- Home, luego Draw, luego Away, de
+    mas a menos favorable al equipo local -- y penaliza menos un pronostico
+    que dijo Home y salio Draw que uno que dijo Home y salio Away. Es el
+    estandar de facto en la literatura academica de forecasting de futbol
+    (Constantinou & Fenton), por eso reemplaza al Brier score generico como
+    la metrica de calibracion mostrada en la app.
+
+    Formula (Epstein 1969, r=3 categorias en el orden H-D-A):
+    RPS = 1/(r-1) * sum_{i=1}^{r-1} (CumForecast_i - CumActual_i)^2
+    El ultimo termino acumulado (i=r) siempre es 0 (forecast y actual suman
+    1) por lo que se omite -- no cambia el resultado, solo evita sumar un
+    termino que siempre es cero."""
+    finished = matches[matches.status == "FINISHED"].copy()
+    if team_key:
+        finished = finished[(finished.home_team_key == team_key) | (finished.away_team_key == team_key)]
+    merged = finished.merge(
+        predictions[["matchday", "home_team_key", "away_team_key", "p_home", "p_draw", "p_away"]],
+        on=["matchday", "home_team_key", "away_team_key"], how="inner",
+    )
+    if merged.empty:
+        return None
+    cum_forecast_1 = merged["p_home"]
+    cum_forecast_2 = merged["p_home"] + merged["p_draw"]
+    is_home = (merged["result"] == "H").astype(float)
+    is_draw = (merged["result"] == "D").astype(float)
+    cum_actual_1 = is_home
+    cum_actual_2 = is_home + is_draw
+    rps = 0.5 * ((cum_forecast_1 - cum_actual_1) ** 2 + (cum_forecast_2 - cum_actual_2) ** 2)
+    return float(rps.mean())
+
+
+def avg_goal_error(matches: pd.DataFrame, predictions: pd.DataFrame,
+                    team_key: str | None = None) -> float | None:
+    """Error promedio de goles totales proyectados vs. el resultado real,
+    sobre las jornadas ya jugadas -- complementa a RPS (calibracion de las 3
+    probabilidades) con una lectura en goles, mas facil de interpretar para
+    quien no trabaja con modelos de probabilidad: "en promedio, el modelo se
+    equivoca por X goles en total por partido".
+
+    El marcador proyectado se aproxima redondeando lambda_home/lambda_away
+    (el gol esperado de cada equipo) en vez de recalcular la matriz de
+    marcadores completa con la correccion Dixon-Coles de goles bajos (rho) --
+    misma idea de fondo que scoreline_accuracy() pero sin necesitar rho por
+    jornada, una diferencia minima para una metrica agregada de temporada."""
+    finished = matches[matches.status == "FINISHED"].copy()
+    if team_key:
+        finished = finished[(finished.home_team_key == team_key) | (finished.away_team_key == team_key)]
+    merged = finished.merge(
+        predictions[["matchday", "home_team_key", "away_team_key", "lambda_home", "lambda_away"]],
+        on=["matchday", "home_team_key", "away_team_key"], how="inner",
+    )
+    if merged.empty:
+        return None
+    proj_total = merged["lambda_home"].round() + merged["lambda_away"].round()
+    real_total = merged["home_score"] + merged["away_score"]
+    return float((proj_total - real_total).abs().mean())
+
+
 def matchday_status(matches: pd.DataFrame) -> tuple[int | None, int | None]:
     """(ultima jornada jugada, proxima jornada) para esta liga/temporada."""
     finished = matches[matches.status == "FINISHED"]

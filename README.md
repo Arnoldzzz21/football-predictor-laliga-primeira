@@ -12,7 +12,7 @@ streamlit run app.py
 - **Season / League / Team / Matchday filters** — full season coverage (38 LaLiga matchdays, 34 Primeira Liga), with Prev/Next navigation on Matchday.
 - **Played matchdays:** projected score vs. actual result side by side, with a scoreline-accuracy badge (how close the projected exact score was to the real one — a full match shows a green checkmark instead of a percentage).
 - **Upcoming matchdays:** projected score, Home/Draw/Away probability bar, and the 3 most likely exact scores.
-- **Model statistics:** 1X2 accuracy trend by matchday, model performance KPIs (Brier score, attack-rating spread, simulation count), and the projected final table (Top 4).
+- **Model statistics:** 4 model-performance KPI tiles (1X2 accuracy for the last played matchday, RPS, average goal error, Monte Carlo simulation count — each color-coded red-to-green by how good the value is), and the projected final table (Top 4).
 
 ## Model
 
@@ -20,7 +20,7 @@ streamlit run app.py
 - Ratings are computed **walk-forward, point-in-time** — matchday *N*'s prediction only ever sees data available before matchday *N* was played, to avoid hindsight bias.
 - **Monte Carlo simulation** (10,000 runs per league/season) projects the rest of the season from the current ratings to estimate final standings, title/Champions League/relegation probabilities.
 - The 1X2 decision rule gives draws a fair chance (`argmax` alone almost never picks a draw, since it's structurally the "middle" outcome) instead of just taking the highest of the three probabilities.
-- Model calibration is tracked with the **Brier score**, not just raw accuracy — a well-calibrated model can be a favorite to "beat the market" even when its top-1 accuracy looks unremarkable.
+- Model calibration is tracked with the **Ranked Probability Score (RPS)**, not just raw accuracy — RPS respects the natural order of the 3 outcomes (Home, Draw, Away), penalizing a Home-predicted-Draw miss less than a Home-predicted-Away miss, unlike a generic Brier score. It's the standard calibration metric in academic football-forecasting literature (Constantinou & Fenton). A well-calibrated model can be a favorite to "beat the market" even when its top-1 accuracy looks unremarkable.
 
 ## Known limitations
 

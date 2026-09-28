@@ -13,7 +13,6 @@ del codigo se quedan en espanol.
 
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -26,7 +25,7 @@ from src.app.data_access import (
     team_name_map, active_season_teams,
     latest_ratings_snapshot, global_params, match_projection,
     matchday_status, matchday_accuracy_trend, scoreline_accuracy,
-    matchday_brier_score,
+    matchday_rps_score, avg_goal_error,
 )
 
 st.set_page_config(page_title="Football Predictor", page_icon="⚽", layout="wide")
@@ -205,46 +204,64 @@ else:
             )
 
 # --------------------------------------------------------------- Statistics --
+# Antes esta seccion tenia 3 columnas: un line chart de tendencia (1X2
+# accuracy by matchday), un bar chart de "Model performance" que mezclaba
+# 4 metricas de distinta unidad en un solo eje (anti-patron de dataviz), y
+# la tabla proyectada. Se reemplazan las primeras 2 por una sola tarjeta de
+# 4 KPIs individuales (cada uno con su propio color rojo->verde segun que
+# tan bueno es el valor), mas legible para alguien que ve la app por
+# primera vez.
 st.markdown("##### Model statistics")
-col1, col2, col3 = st.columns(3)
+col_kpi, col_top4 = st.columns([2, 1])
 
-with col1:
+with col_kpi:
     mds, acc = matchday_accuracy_trend(matches, predictions, team_key)
-    st.markdown(
-        '<div class="fp-card">'
-        '<span style="font-size:12px; color:#8892B0;">1X2 accuracy by matchday</span>'
-        + C.accuracy_trend_svg(mds, acc) +
-        '</div>',
-        unsafe_allow_html=True,
-    )
+    last_acc = acc[-1] if acc else None
+    last_md_played = mds[-1] if mds else None
 
-with col2:
-    overall_acc = np.mean(acc) if acc else 0.0
+    rps = matchday_rps_score(matches, predictions, team_key)
+    goal_err = avg_goal_error(matches, predictions, team_key)
     n_sims = int(simulations.n_simulations.iloc[0]) if not simulations.empty else 0
-    # Brier score (0-0.667, lower = better calibrated) se muestra como
-    # "skill vs. random" (0-100%, mayor = mejor) para que la barra sea
-    # comparable a las demas -- la etiqueta debajo muestra el Brier real.
-    # Reemplaza al viejo "exact score" (era overall_acc*0.4, un numero
-    # inventado, no una metrica real).
-    brier = matchday_brier_score(matches, predictions, team_key)
-    uniform_brier = 2 / 3
-    brier_skill_pct = max(0.0, (uniform_brier - brier) / uniform_brier * 100) if brier is not None else 0.0
-    kpi_values = [overall_acc, brier_skill_pct, float(snap["attack"].std()) * 100, n_sims / 100]
-    kpi_labels = [
-        f"{overall_acc:.0f}% 1X2",
-        f"Brier {brier:.3f}" if brier is not None else "Brier n/a",
-        f"attack σ {snap['attack'].std():.2f}",
-        f"{n_sims:,} sims",
+
+    # Techo usado solo para colorear el KPI de error de goles (0 goles de
+    # error -> quality 1/verde, GOAL_ERR_CEILING+ goles de error -> quality
+    # 0/rojo). No afecta el numero mostrado, solo el color.
+    GOAL_ERR_CEILING = 3.0
+
+    tiles = [
+        {
+            "value": f"{last_acc:.0f}%" if last_acc is not None else "n/a",
+            "label": f"1X2 accuracy · MD{last_md_played}" if last_md_played is not None else "1X2 accuracy",
+            "quality": (last_acc / 100) if last_acc is not None else None,
+        },
+        {
+            "value": f"{rps:.3f}" if rps is not None else "n/a",
+            "label": "RPS (lower is better)",
+            # RPS ya esta acotado 0-1 (mientras mas bajo, mejor calibrado).
+            "quality": (1 - rps) if rps is not None else None,
+        },
+        {
+            "value": f"{goal_err:.1f}" if goal_err is not None else "n/a",
+            "label": "Avg goal error",
+            "quality": max(0.0, 1 - goal_err / GOAL_ERR_CEILING) if goal_err is not None else None,
+        },
+        {
+            "value": f"{n_sims:,}",
+            "label": "Monte Carlo sims",
+            # Sin color de calidad: mas simulaciones no es "mejor modelo",
+            # solo dice cuanto computo se uso.
+            "quality": None,
+        },
     ]
     st.markdown(
         '<div class="fp-card">'
         '<span style="font-size:12px; color:#8892B0;">Model performance</span>'
-        + C.kpi_bars(kpi_values, kpi_labels) +
+        + C.kpi_tiles(tiles) +
         '</div>',
         unsafe_allow_html=True,
     )
 
-with col3:
+with col_top4:
     top4 = simulations.sort_values("avg_position").head(4).copy()
     rows = [
         {"pos": i + 1, "name": name_of.get(r.team_key, r.team_key),
