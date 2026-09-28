@@ -39,4 +39,6 @@ season simulations).
 - **Silver:** team names resolved to canonical `team_key`, match result and goal difference added.
 - **Gold:** `team_ratings` (Dixon-Coles attack/defense per team/matchday), `match_predictions` (pre-match probabilities), `season_simulations` (Monte Carlo projections).
 
-**Live app:** [football-predictor-arnoldo.streamlit.app](https://football-predictor-arnoldo.streamlit.app/)
+**Live app**
+
+View it here:[football-predictor-arnoldo.streamlit.app](https://football-predictor-arnoldo.streamlit.app/)
