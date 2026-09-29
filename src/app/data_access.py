@@ -261,6 +261,43 @@ def avg_goal_error(matches: pd.DataFrame, predictions: pd.DataFrame,
     return float((proj_total - real_total).abs().mean())
 
 
+def avg_real_goals(stats_matches: pd.DataFrame, all_matches: pd.DataFrame,
+                    team_key: str | None = None) -> tuple[float | None, bool]:
+    """Promedio de goles REALES anotados por partido -- reemplaza al viejo
+    uso de avg_goal_error() en la tarjeta 'Avg goals', que en realidad
+    mostraba el error de proyeccion del modelo (|goles proyectados - goles
+    reales|), no un promedio de goles. Esta funcion sí devuelve el
+    promedio de goles anotados de verdad.
+
+    stats_matches: partidos de la jornada seleccionada en el filtro
+    MATCHDAY. Si ya tiene partidos FINISHED, el promedio se calcula solo
+    sobre esa jornada.
+
+    all_matches: todos los partidos de la liga/temporada actual (ya
+    filtrados por liga desde app.py via load_matches). Sirve de fallback
+    cuando la jornada seleccionada todavia no se jugo -- en vez de "n/a",
+    la tarjeta muestra el promedio de goles de la temporada hasta la
+    fecha ("las jornadas que no se han jugado aprenden de las que ya se
+    jugaron"), siempre dentro de la misma liga para no mezclar el ritmo de
+    gol de LaLiga con el de Primeira Liga.
+
+    Devuelve (valor, es_promedio_de_temporada) para que quien llama pueda
+    ajustar la etiqueta segun si el numero es de la jornada exacta o del
+    fallback de temporada."""
+    def _avg(df: pd.DataFrame) -> float | None:
+        finished = df[df.status == "FINISHED"]
+        if team_key:
+            finished = finished[(finished.home_team_key == team_key) | (finished.away_team_key == team_key)]
+        if finished.empty:
+            return None
+        return float((finished.home_score + finished.away_score).mean())
+
+    md_avg = _avg(stats_matches)
+    if md_avg is not None:
+        return md_avg, False
+    return _avg(all_matches), True
+
+
 def avg_prob_on_actual(matches: pd.DataFrame, predictions: pd.DataFrame,
                         team_key: str | None = None) -> float | None:
     """Probabilidad promedio (0-100%, mientras mas alto mejor) que el modelo

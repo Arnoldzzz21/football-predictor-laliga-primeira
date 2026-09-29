@@ -25,7 +25,7 @@ from src.app.data_access import (
     team_name_map, active_season_teams,
     latest_ratings_snapshot, global_params, match_projection,
     matchday_status, matchday_accuracy_trend, scoreline_accuracy,
-    matchday_rps_score, avg_goal_error, avg_prob_on_actual,
+    matchday_rps_score, avg_real_goals, avg_prob_on_actual,
 )
 
 st.set_page_config(page_title="Football Predictor", page_icon="⚽", layout="wide")
@@ -227,13 +227,8 @@ with col_kpi:
     md_acc = acc[0] if acc else None
 
     rps = matchday_rps_score(stats_matches, predictions, team_key)
-    goal_err = avg_goal_error(stats_matches, predictions, team_key)
+    real_goals, is_season_avg = avg_real_goals(stats_matches, matches, team_key)
     prob_actual = avg_prob_on_actual(stats_matches, predictions, team_key)
-
-    # Techo usado solo para colorear el KPI de error de goles (0 goles de
-    # error -> quality 1/verde, GOAL_ERR_CEILING+ goles de error -> quality
-    # 0/rojo). No afecta el numero mostrado, solo el color.
-    GOAL_ERR_CEILING = 3.0
 
     tiles = [
         {
@@ -248,9 +243,15 @@ with col_kpi:
             "quality": (1 - rps) if rps is not None else None,
         },
         {
-            "value": f"{goal_err:.1f}" if goal_err is not None else "n/a",
-            "label": "Avg goals",
-            "quality": max(0.0, 1 - goal_err / GOAL_ERR_CEILING) if goal_err is not None else None,
+            "value": f"{real_goals:.1f}" if real_goals is not None else "n/a",
+            # Si la jornada seleccionada ya se jugo, es su propio promedio;
+            # si no, cae al promedio de la temporada (ver avg_real_goals).
+            "label": (f"Avg goals · MD{selected_md}" if real_goals is not None and not is_season_avg
+                      else "Avg goals · season so far"),
+            # No es una metrica de calidad del modelo, solo describe cuanto
+            # se anoto -- quality=None deja el numero sin colorear (ver
+            # kpi_tiles()).
+            "quality": None,
         },
         {
             "value": f"{prob_actual:.0f}%" if prob_actual is not None else "n/a",
