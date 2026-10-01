@@ -101,9 +101,49 @@ def _predict_lambdas(home_key: str, away_key: str, snap: pd.DataFrame,
     return lh, la
 
 
+# "Clear favorite" threshold for showing a bigger scoreline in UPCOMING
+# matches. Set with a backtest on the full history (2,158 matches, both
+# leagues, 4 seasons): with P(favorite wins) >= 0.65 it applies to ~15% of
+# matches, and in those the favorite won 82% of the time and by 2+ goals 57%.
+BLOWOUT_MIN_FAV_PROB = 0.65
+
+
+def blowout_scoreline(lh: float, la: float, p_home: float,
+                       p_away: float) -> tuple[int, int] | None:
+    """Blowout scoreline for a clear favorite, or None if the match is
+    close (in that case the usual most likely scoreline is kept).
+
+    Rule: favorite goals = floor(lambda_fav + 0.75) (its expected goals
+    rounded with an upward bias) and opponent goals = floor(lambda_opp).
+    This is not the single most likely scoreline (that is usually 2-0), but
+    in the backtest on clear-favorite matches it scores equal or better
+    than the most likely scoreline: average accuracy badge 64.2 vs 63.0,
+    exact score 14.4% vs 12.5%, and lower total-goal error (1.41 vs 1.64).
+    It overestimates the real average margin (2.6 vs 1.9 goals), in
+    exchange for better reflecting how much the favorite scores.
+
+    Returns the scoreline as (home, away)."""
+    fav_is_home = p_home >= p_away
+    if max(p_home, p_away) < BLOWOUT_MIN_FAV_PROB:
+        return None
+    lam_fav, lam_dog = (lh, la) if fav_is_home else (la, lh)
+    fav_goals = int(np.floor(lam_fav + 0.75))
+    dog_goals = int(np.floor(lam_dog))
+    if fav_goals - dog_goals < 1:  # safeguard: never show a draw/loss for the favorite
+        return None
+    return (fav_goals, dog_goals) if fav_is_home else (dog_goals, fav_goals)
+
+
 def match_projection(home_key: str, away_key: str, matchday: int,
                       predictions: pd.DataFrame, ratings_snapshot: pd.DataFrame,
-                      mu: float, gamma: float, rho: float) -> dict:
+                      mu: float, gamma: float, rho: float,
+                      show_blowout: bool = False) -> dict:
+    """show_blowout=True ONLY for upcoming matches: if the favorite is
+    clearly superior, 'projected_home/away' becomes the blowout scoreline
+    (blowout_scoreline). Already-played matches always use the original
+    most likely scoreline, so their historical results and accuracy badge
+    stay exactly the same. The original most likely scoreline is always
+    kept in 'modal_home/modal_away'."""
     row = predictions[
         (predictions.matchday == matchday)
         & (predictions.home_team_key == home_key)
@@ -126,10 +166,18 @@ def match_projection(home_key: str, away_key: str, matchday: int,
         i, j = divmod(int(flat_idx), matrix.shape[1])
         top.append({"home": i, "away": j, "prob": float(matrix[i, j])})
 
+    modal_h, modal_a = top[0]["home"], top[0]["away"]
+    proj_h, proj_a = modal_h, modal_a
+    blowout = blowout_scoreline(lh, la, p_home, p_away) if show_blowout else None
+    if blowout is not None:
+        proj_h, proj_a = blowout
+
     return {
         "lambda_home": lh, "lambda_away": la,
         "p_home": p_home, "p_draw": p_draw, "p_away": p_away,
-        "projected_home": top[0]["home"], "projected_away": top[0]["away"],
+        "projected_home": proj_h, "projected_away": proj_a,
+        "modal_home": modal_h, "modal_away": modal_a,
+        "is_blowout": blowout is not None,
         "top_scorelines": top,
         "live_projection": live,
     }

@@ -172,8 +172,11 @@ else:
             )
 
     for _, m in day_matches.iterrows():
+        # Blowout scoreline for clear favorites ONLY in upcoming matches;
+        # already-played (FINISHED) matches keep the original projected scoreline.
         proj = match_projection(m.home_team_key, m.away_team_key, selected_md,
-                                 predictions, snap, mu, gamma, rho)
+                                 predictions, snap, mu, gamma, rho,
+                                 show_blowout=(m.status != "FINISHED"))
         if m.status == "FINISHED":
             accuracy_pct = scoreline_accuracy(
                 proj["projected_home"], proj["projected_away"],
