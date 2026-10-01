@@ -1,6 +1,6 @@
 leagues:
   laliga:
-    name: LaLiga EA Sports            # no lo usa setup_data_lake.py hoy, pero lo va a pedir el frontend
+    name: LaLiga EA Sports            # not used by setup_data_lake.py today, but the frontend will need it
     country: Spain
     country_flag_iso2: ES
     historical_seasons:

@@ -1,23 +1,23 @@
 """
 setup_data_lake.py
 -------------------
-Módulo 1 — arranque del Data Lake local.
+Module 1 — local Data Lake bootstrap.
 
-Qué hace:
-1. Crea el árbol de carpetas completo (bronze/silver/gold/reference) para
-   ambas ligas y las 4 temporadas (3 históricas estáticas + la activa
-   2026-2027).
-2. Siembra en `bronze/` y `silver/` un archivo `matches.parquet` VACÍO pero
-   con el esquema correcto (ver src/utils/schema.py) en cada partición
-   liga-temporada QUE TODAVÍA NO EXISTA. Si la partición ya tiene datos
-   reales (como el bronze ya extraído con Football_Data_Extraction.ipynb),
-   se salta y no la toca — este guard es lo que permite correr este script
-   después de haber extraído datos reales, sin perderlos.
-3. Siembra `reference/teams_master.parquet` con los equipos ascendidos
-   2026-2027 ya cargados desde config/leagues.yaml (Módulo 2 arranca
-   con esto ya resuelto, en vez de descubrirlo más adelante).
+What it does:
+1. Creates the full folder tree (bronze/silver/gold/reference) for both
+   leagues and the 4 seasons (3 static historical ones + the active
+   2026-2027 one).
+2. Seeds `bronze/` and `silver/` with an EMPTY `matches.parquet` that has
+   the correct schema (see src/utils/schema.py) in every league-season
+   partition THAT DOESN'T EXIST YET. If the partition already has real data
+   (such as the bronze already extracted with Football_Data_Extraction.ipynb),
+   it is skipped and left untouched — this guard is what makes it safe to
+   run this script after real data has been extracted, without losing it.
+3. Seeds `reference/teams_master.parquet` with the 2026-2027 promoted teams
+   already loaded from config/leagues.yaml (Module 2 starts with this
+   already resolved, instead of discovering it later).
 
-Ejecutar desde la raíz del proyecto (importante: usa rutas relativas):
+Run from the project root (important: it uses relative paths):
     python setup_data_lake.py
 """
 
@@ -39,12 +39,12 @@ def load_config() -> dict:
 
 
 def empty_table(schema: pa.Schema) -> pa.Table:
-    """Tabla vacía pero tipada — clave para que pyarrow no tenga que adivinar tipos después."""
+    """Empty but typed table — key so pyarrow doesn't have to guess types later."""
     return pa.table({name: pa.array([], type=field.type) for name, field in zip(schema.names, schema)}, schema=schema)
 
 
 def build_folder_tree(config: dict) -> None:
-    layers_with_seasons = ["bronze", "silver"]  # gold se genera desde el modelo, no se siembra vacío aquí
+    layers_with_seasons = ["bronze", "silver"]  # gold is generated from the model, it is not seeded empty here
 
     for league_key, league_cfg in config["leagues"].items():
         all_seasons = league_cfg["historical_seasons"] + [league_cfg["active_season"]]
@@ -54,19 +54,19 @@ def build_folder_tree(config: dict) -> None:
                 partition_dir = LAKE_ROOT / layer / league_key / f"season={season}"
                 out_path = partition_dir / "matches.parquet"
 
-                # Guard: si ya hay datos reales en esta partición (ej. bronze ya
-                # extraído con Football_Data_Extraction.ipynb), no lo sobreescribimos
-                # con una tabla vacía.
+                # Guard: if there is already real data in this partition (e.g.
+                # bronze already extracted with Football_Data_Extraction.ipynb),
+                # we don't overwrite it with an empty table.
                 if out_path.exists():
-                    print(f"  [{layer}] {league_key} / {season} -> ya existe, no se sobreescribe")
+                    print(f"  [{layer}] {league_key} / {season} -> already exists, not overwritten")
                     continue
 
                 write_partition(empty_table(MATCHES_BRONZE_SCHEMA), out_path)
-                tag = "ACTIVA (on-demand)" if season == league_cfg["active_season"] else "histórica (estática)"
+                tag = "ACTIVE (on-demand)" if season == league_cfg["active_season"] else "historical (static)"
                 print(f"  [{layer}] {league_key} / {season} [{tag}] -> {out_path}")
 
-    # gold/ se crea vacío de estructura (sin parquet sembrado) porque su
-    # contenido depende del modelo Dixon-Coles (Módulo 3), no de la ingesta.
+    # gold/ is created as an empty structure (no seeded parquet) because its
+    # content depends on the Dixon-Coles model (Module 3), not on ingestion.
     for sub in ["team_strength", "match_features", "simulations"]:
         (LAKE_ROOT / "gold" / sub).mkdir(parents=True, exist_ok=True)
 
@@ -74,10 +74,10 @@ def build_folder_tree(config: dict) -> None:
 def seed_teams_master(config: dict) -> None:
     out_path = LAKE_ROOT / "reference" / "teams_master.parquet"
 
-    # Mismo guard: si ya se sembró (o ya se curó a mano con más equipos que
-    # los ascendidos), no lo pisamos.
+    # Same guard: if it was already seeded (or already curated by hand with
+    # more teams than just the promoted ones), we don't overwrite it.
     if out_path.exists():
-        print(f"\n  [reference] teams_master ya existe, no se sobreescribe -> {out_path}")
+        print(f"\n  [reference] teams_master already exists, not overwritten -> {out_path}")
         return
 
     rows = {name: [] for name in TEAMS_MASTER_SCHEMA.names}
@@ -87,7 +87,7 @@ def seed_teams_master(config: dict) -> None:
         for team_name in promoted:
             rows["team_key"].append(team_name.lower().replace(" ", "_"))
             rows["official_name"].append(team_name)
-            rows["short_code"].append("")  # se completa a mano/curado, no se inventa un código
+            rows["short_code"].append("")  # filled in by hand/curated, a code is not made up
             rows["league"].append(league_key)
             rows["country"].append(league_cfg["country"])
             rows["country_flag_iso2"].append(league_cfg["country_flag_iso2"])
@@ -97,15 +97,15 @@ def seed_teams_master(config: dict) -> None:
 
     table = pa.table(rows, schema=TEAMS_MASTER_SCHEMA)
     write_partition(table, out_path)
-    print(f"\n  [reference] teams_master sembrado con {table.num_rows} equipos ascendidos -> {out_path}")
+    print(f"\n  [reference] teams_master seeded with {table.num_rows} promoted teams -> {out_path}")
 
 
 def main() -> None:
     config = load_config()
-    print("Creando árbol del Data Lake...\n")
+    print("Creating the Data Lake tree...\n")
     build_folder_tree(config)
     seed_teams_master(config)
-    print("\nListo. Estructura creada bajo ./data/")
+    print("\nDone. Structure created under ./data/")
 
 
 if __name__ == "__main__":

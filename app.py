@@ -1,14 +1,14 @@
 """
 app.py
 ------
-Football Predictor -- LaLiga EA Sports & Primeira Liga (temporada 2026-2027)
-Entry point de la app en Streamlit. Corre con:
+Football Predictor -- LaLiga EA Sports & Primeira Liga (2026-2027 season)
+Streamlit app entry point. Run it with:
 
     streamlit run app.py
 
-desde la raiz del proyecto (usa rutas relativas a data/ igual que el resto
-del pipeline). Todo el texto visible en la UI va en ingles; los comentarios
-del codigo se quedan en espanol.
+from the project root (it uses paths relative to data/, like the rest of
+the pipeline). All user-visible UI text is in English, and so are the code
+comments.
 """
 
 from __future__ import annotations
@@ -50,18 +50,18 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ------------------------------------------------------------- Filtros --
-# Las 4 tarjetas se llenan en orden de dependencia (season/liga -> datos de
-# esa season+liga -> equipo/jornada), pero cada `with` coloca su contenido
-# en la columna que le corresponde sin importar el orden de ejecucion.
+# ------------------------------------------------------------- Filters --
+# The 4 cards are filled in dependency order (season/league -> data for
+# that season+league -> team/matchday), but each `with` places its content
+# in its own column regardless of execution order.
 f_season, f_league, f_team, f_md = st.columns(4)
 
 with f_season:
     with st.container(border=True):
         _filter_label("SEASON", ACCENT)
-        # Por ahora AVAILABLE_SEASONS solo trae la temporada activa (ver
-        # nota en data_access.py) -- el slicer ya queda listo para cuando
-        # arranque la proxima temporada, sin mas cambios en la UI.
+        # For now AVAILABLE_SEASONS only holds the active season (see the
+        # note in data_access.py) -- the slicer is already ready for when
+        # the next season starts, with no further UI changes.
         season = st.selectbox(
             "Season", options=AVAILABLE_SEASONS, label_visibility="collapsed",
         )
@@ -98,10 +98,10 @@ with f_team:
         )
 team_key = None if team_filter == "All" else team_filter
 
-# Navegacion de jornada: botones Prev/Next ademas del selectbox, para no
-# depender de hacer scroll (o escribir a buscar) dentro de una lista de 38
-# opciones -- el usuario reporto que el selectbox solo no era intuitivo
-# para moverse por jornadas lejos de la actual.
+# Matchday navigation: Prev/Next buttons in addition to the selectbox, so
+# users don't have to scroll (or type to search) through a list of 38
+# options -- users reported that the selectbox alone wasn't intuitive for
+# moving to matchdays far from the current one.
 md_key = f"md_select_{season}_{league}"
 if md_key not in st.session_state or st.session_state[md_key] not in all_mds:
     st.session_state[md_key] = default_md
@@ -142,9 +142,9 @@ def _matches_for(md: int) -> pd.DataFrame:
 
 
 # --------------------------------------------------------------- Matchday --
-# Un solo selector cubre las 38 (LaLiga) / 34 (Primeira Liga) jornadas de la
-# temporada: si ya se jugo se muestra proyectado vs. resultado real, si no,
-# la proyeccion del modelo (con el mismo fallback en vivo de siempre).
+# A single selector covers all 38 (LaLiga) / 34 (Primeira Liga) matchdays of
+# the season: if it has been played it shows projected vs. actual result,
+# otherwise the model projection (with the same live fallback as always).
 if selected_md is None:
     st.info("No matches loaded yet for this league/season.")
 else:
@@ -153,11 +153,11 @@ else:
     has_played = finished_count > 0
     all_played = not day_matches.empty and finished_count == len(day_matches)
 
-    # Estado por jornada basado en si al menos un partido ya se jugo (no si
-    # TODOS se jugaron): una jornada con un partido aplazado/reprogramado
-    # (status POSTPONED/TIMED) sigue contando como jugada para los que ya
-    # tienen resultado -- cada partido se renderiza segun su propio status,
-    # no segun el status agregado de la jornada.
+    # Per-matchday status based on whether at least one match has been
+    # played (not whether ALL were): a matchday with a postponed/rescheduled
+    # match (status POSTPONED/TIMED) still counts as played for the matches
+    # that already have a result -- each match is rendered according to its
+    # own status, not the matchday's aggregate status.
     if has_played:
         header_label = "Played" if all_played else f"In progress · {finished_count}/{len(day_matches)} played"
         st.markdown(f"##### Matchday {selected_md} · {LEAGUE_LABELS[league]} — {header_label}")
@@ -207,23 +207,23 @@ else:
             )
 
 # --------------------------------------------------------------- Statistics --
-# Antes esta seccion tenia 3 columnas: un line chart de tendencia (1X2
-# accuracy by matchday), un bar chart de "Model performance" que mezclaba
-# 4 metricas de distinta unidad en un solo eje (anti-patron de dataviz), y
-# la tabla proyectada. Se reemplazan las primeras 2 por una sola tarjeta de
-# 4 KPIs individuales (cada uno con su propio color rojo->verde segun que
-# tan bueno es el valor), mas legible para alguien que ve la app por
-# primera vez.
+# This section used to have 3 columns: a trend line chart (1X2 accuracy by
+# matchday), a "Model performance" bar chart that mixed 4 metrics with
+# different units on a single axis (a dataviz anti-pattern), and the
+# projected table. The first two are replaced by a single card with 4
+# individual KPIs (each with its own red->green color depending on how
+# good the value is), easier to read for someone seeing the app for the
+# first time.
 st.markdown("##### Model statistics")
 col_kpi, col_top4 = st.columns([2, 1])
 
 with col_kpi:
-    # Los 4 KPIs se calculan solo sobre los partidos de la JORNADA
-    # seleccionada en el filtro MATCHDAY (no sobre toda la temporada) --
-    # asi la seccion reacciona al filtro igual que las tarjetas de
-    # partidos de arriba. Si la jornada elegida todavia no se jugo
-    # (ningun partido FINISHED), las funciones de mas abajo ya devuelven
-    # None/listas vacias con este subset y las tarjetas muestran "n/a".
+    # The 4 KPIs are computed only over the matches of the matchday
+    # SELECTED in the MATCHDAY filter (not over the whole season) -- this
+    # way the section reacts to the filter just like the match cards above.
+    # If the selected matchday hasn't been played yet (no FINISHED match),
+    # the functions below already return None/empty lists for this subset
+    # and the tiles show "n/a".
     stats_matches = matches[matches.matchday == selected_md] if selected_md is not None else matches.iloc[0:0]
 
     mds, acc = matchday_accuracy_trend(stats_matches, predictions, team_key)
@@ -242,24 +242,25 @@ with col_kpi:
         {
             "value": f"{rps:.3f}" if rps is not None else "n/a",
             "label": "RPS (lower is better)",
-            # RPS ya esta acotado 0-1 (mientras mas bajo, mejor calibrado).
+            # RPS is already bounded 0-1 (the lower, the better calibrated).
             "quality": (1 - rps) if rps is not None else None,
         },
         {
             "value": f"{real_goals:.1f}" if real_goals is not None else "n/a",
-            # Si la jornada seleccionada ya se jugo, es su propio promedio;
-            # si no, cae al promedio de la temporada (ver avg_real_goals).
+            # If the selected matchday has been played, this is its own average;
+            # otherwise it falls back to the season average (see
+            # avg_real_goals).
             "label": (f"Avg goals · MD{selected_md}" if real_goals is not None and not is_season_avg
                       else "Avg goals · season so far"),
-            # No es una metrica de calidad del modelo, solo describe cuanto
-            # se anoto -- quality=None deja el numero sin colorear (ver
+            # Not a model quality metric, it only describes how much was
+            # scored -- quality=None leaves the number uncolored (see
             # kpi_tiles()).
             "quality": None,
         },
         {
             "value": f"{prob_actual:.0f}%" if prob_actual is not None else "n/a",
             "label": "Avg prob on actual result",
-            # Ya viene 0-100%, mientras mas alto mejor -- se usa directo.
+            # Already 0-100%, the higher the better -- used directly.
             "quality": (prob_actual / 100) if prob_actual is not None else None,
         },
     ]

@@ -1,18 +1,18 @@
 """
 data_access.py
 ---------------
-Capa de lectura para la app: envuelve src/utils/parquet_io.py con cache de
-Streamlit y agrega la logica de proyeccion de partido (lambda_home/away,
-matriz de marcadores, top-3 resultados mas probables) reutilizando
-src/utils/dixon_coles.py.
+Read layer for the app: wraps src/utils/parquet_io.py with Streamlit
+caching and adds the match projection logic (lambda_home/away, scoreline
+matrix, top-3 most likely scorelines) reusing src/utils/dixon_coles.py.
 
-Nota de estado real del pipeline (2026-09-26): Team_Ratings_Builder corre
-hasta la jornada que ya se jugo (incluye la jornada recien cerrada), pero
-Match_Predictions_Builder puede quedar un paso atras (todavia no genera la
-fila de la proxima jornada). Por eso match_projection() calcula la
-proyeccion en vivo con la ultima foto de team_ratings cuando no encuentra
-la fila ya guardada en match_predictions -- la app nunca debe quedar sin
-proyeccion para la proxima jornada.
+Note on the actual state of the pipeline (2026-09-26): Team_Ratings_Builder
+runs up to the matchday that has already been played (including the
+just-closed matchday), but Match_Predictions_Builder can lag one step
+behind (it hasn't generated the next matchday's row yet). That is why
+match_projection() computes the projection live with the latest
+team_ratings snapshot when it doesn't find the already-saved row in
+match_predictions -- the app must never be left without a projection for
+the next matchday.
 """
 
 from __future__ import annotations
@@ -29,13 +29,13 @@ from src.utils.dixon_coles import score_matrix, outcome_probs
 LAKE_ROOT = Path("data")
 ACTIVE_SEASON = "2026-2027"
 
-# De momento la app solo expone la temporada activa en el slicer de Season
-# -- el Data Lake ya tiene Silver/Gold de 3 temporadas anteriores (usadas
-# como historico para entrenar el modelo), pero season_simulations (Monte
-# Carlo) solo existe para la temporada activa, asi que navegar temporadas
-# pasadas desde la UI dejaria la tabla proyectada rota. Cuando arranque
-# 2027-2028 esta lista pasa a tener 2 elementos y el slicer queda listo
-# para eso sin mas cambios.
+# For now the app only exposes the active season in the Season slicer --
+# the Data Lake already has Silver/Gold for 3 earlier seasons (used as
+# history to train the model), but season_simulations (Monte Carlo) only
+# exists for the active season, so navigating past seasons from the UI
+# would leave the projected table broken. When 2027-2028 starts this list
+# will have 2 elements and the slicer will be ready for that with no
+# further changes.
 AVAILABLE_SEASONS = [ACTIVE_SEASON]
 
 LEAGUE_LABELS = {"laliga": "LaLiga EA Sports", "primeira_liga": "Primeira Liga"}
@@ -81,7 +81,7 @@ def active_season_teams(matches: pd.DataFrame) -> list[str]:
 
 
 def latest_ratings_snapshot(ratings: pd.DataFrame) -> pd.DataFrame:
-    """Una fila por team_key, a la jornada mas reciente disponible."""
+    """One row per team_key, at the most recent matchday available."""
     last_md = ratings["matchday"].max()
     return ratings[ratings["matchday"] == last_md].set_index("team_key")
 
@@ -93,7 +93,7 @@ def global_params(ratings_snapshot: pd.DataFrame) -> tuple[float, float, float]:
 
 def _predict_lambdas(home_key: str, away_key: str, snap: pd.DataFrame,
                       mu: float, gamma: float) -> tuple[float, float]:
-    """Misma forma funcional que entrena fit_dixon_coles (dixon_coles.py)."""
+    """Same functional form that fit_dixon_coles trains (dixon_coles.py)."""
     att_h, def_h = snap.loc[home_key, ["attack", "defense"]]
     att_a, def_a = snap.loc[away_key, ["attack", "defense"]]
     lh = float(np.exp(mu + gamma + att_h - def_a))
@@ -185,12 +185,12 @@ def match_projection(home_key: str, away_key: str, matchday: int,
 
 def scoreline_accuracy(proj_h: int, proj_a: int, final_h: int, final_a: int,
                         penalty_per_goal: float = 20.0) -> float:
-    """Que tan cerca estuvo el marcador exacto proyectado (proj_h-proj_a) del
-    resultado final (final_h-final_a) -- el badge que se muestra junto al
-    resultado final en la app. 100% si el marcador coincide exacto; baja
-    `penalty_per_goal` puntos porcentuales por cada gol de diferencia total
-    (|home| + |away|), sin bajar de 0. Con el default de 20 pts/gol: mismo
-    marcador -> 100%, un gol de diferencia -> 80%, dos -> 60%, etc."""
+    """How close the projected exact scoreline (proj_h-proj_a) was to the
+    final result (final_h-final_a) -- the badge shown next to the final
+    result in the app. 100% if the scoreline matches exactly; it drops
+    `penalty_per_goal` percentage points for each goal of total difference
+    (|home| + |away|), never below 0. With the default of 20 pts/goal: same
+    scoreline -> 100%, one goal off -> 80%, two -> 60%, etc."""
     diff = abs(proj_h - final_h) + abs(proj_a - final_a)
     return max(0.0, 100.0 - penalty_per_goal * diff)
 
@@ -200,22 +200,22 @@ DRAW_MARGIN = 0.06
 
 def predicted_outcome(p_home: float, p_draw: float, p_away: float,
                        draw_margin: float = DRAW_MARGIN) -> str:
-    """Etiqueta 1X2 que el modelo 'apuesta' para un partido, dadas sus 3
-    probabilidades. Con argmax() puro el empate practicamente nunca gana
-    (es el resultado "del medio" entre dos alternativas mas extremas): en
-    el historial completo (4 temporadas, ambas ligas, 2158 partidos jugados)
-    el modelo elegia Draw como resultado mas probable en apenas 0.5% de los
-    casos, contra un 26% de empates reales.
+    """1X2 label the model 'bets' on for a match, given its 3
+    probabilities. With a plain argmax() the draw practically never wins
+    (it is the "middle" outcome between two more extreme alternatives): over
+    the full history (4 seasons, both leagues, 2158 matches played) the
+    model picked Draw as the most likely outcome in only 0.5% of cases,
+    against 26% of real draws.
 
-    Este ajuste le da al empate una oportunidad justa: si p_draw esta a
-    menos de `draw_margin` puntos porcentuales de la probabilidad mas alta
-    entre local/visita, se predice Draw. Medido contra el mismo historial,
-    esto es un trade-off honesto, no una mejora gratis: con margin=0.06 la
-    precision 1X2 baja ~0.6pp (53.0% -> 52.4%) pero el modelo pasa de
-    "casi nunca" a "a veces" predecir empate (0.5% -> 5.2% de los partidos,
-    y de los empates reales que efectivamente detecta, de 0.4% a 6.1%) --
-    una version que nunca dice Draw se ve poco creible aunque tecnicamente
-    argmax puro maximice el % de acierto bruto."""
+    This adjustment gives the draw a fair chance: if p_draw is within
+    `draw_margin` of the highest probability between home/away, Draw is
+    predicted. Measured against the same history, this is an honest
+    trade-off, not a free improvement: with margin=0.06 1X2 accuracy drops
+    ~0.6pp (53.0% -> 52.4%) but the model goes from "almost never" to
+    "sometimes" predicting a draw (0.5% -> 5.2% of matches, and of the real
+    draws it actually detects, from 0.4% to 6.1%) -- a version that never
+    says Draw looks unconvincing even though technically a plain argmax
+    maximizes raw accuracy."""
     best_side = "H" if p_home >= p_away else "A"
     best_side_p = max(p_home, p_away)
     if p_draw >= best_side_p - draw_margin:
@@ -225,10 +225,10 @@ def predicted_outcome(p_home: float, p_draw: float, p_away: float,
 
 def matchday_brier_score(matches: pd.DataFrame, predictions: pd.DataFrame,
                           team_key: str | None = None) -> float | None:
-    """Brier score promedio (0 a 0.667, mientras mas bajo mejor) sobre las
-    jornadas ya jugadas: mide que tan bien calibradas estan las 3
-    probabilidades completas, no solo si se acerto el resultado mas
-    probable -- por eso complementa (no reemplaza) la precision 1X2 de
+    """Average Brier score (0 to 0.667, the lower the better) over the
+    matchdays already played: it measures how well calibrated the full set
+    of 3 probabilities is, not just whether the most likely outcome was
+    right -- so it complements (does not replace) the 1X2 accuracy from
     matchday_accuracy_trend()."""
     finished = matches[matches.status == "FINISHED"].copy()
     if team_key:
@@ -248,21 +248,21 @@ def matchday_brier_score(matches: pd.DataFrame, predictions: pd.DataFrame,
 
 def matchday_rps_score(matches: pd.DataFrame, predictions: pd.DataFrame,
                         team_key: str | None = None) -> float | None:
-    """Ranked Probability Score promedio (0 a 1, mientras mas bajo mejor)
-    sobre las jornadas ya jugadas. A diferencia del Brier score (que trata
-    Home/Draw/Away como categorias sin relacion entre si), RPS respeta el
-    orden natural de los 3 resultados -- Home, luego Draw, luego Away, de
-    mas a menos favorable al equipo local -- y penaliza menos un pronostico
-    que dijo Home y salio Draw que uno que dijo Home y salio Away. Es el
-    estandar de facto en la literatura academica de forecasting de futbol
-    (Constantinou & Fenton), por eso reemplaza al Brier score generico como
-    la metrica de calibracion mostrada en la app.
+    """Average Ranked Probability Score (0 to 1, the lower the better) over
+    the matchdays already played. Unlike the Brier score (which treats
+    Home/Draw/Away as unrelated categories), RPS respects the natural order
+    of the 3 outcomes -- Home, then Draw, then Away, from most to least
+    favorable to the home team -- and penalizes a forecast that said Home
+    and turned out Draw less than one that said Home and turned out Away.
+    It is the de facto standard in the academic football-forecasting
+    literature (Constantinou & Fenton), which is why it replaces the generic
+    Brier score as the calibration metric shown in the app.
 
-    Formula (Epstein 1969, r=3 categorias en el orden H-D-A):
+    Formula (Epstein 1969, r=3 categories in H-D-A order):
     RPS = 1/(r-1) * sum_{i=1}^{r-1} (CumForecast_i - CumActual_i)^2
-    El ultimo termino acumulado (i=r) siempre es 0 (forecast y actual suman
-    1) por lo que se omite -- no cambia el resultado, solo evita sumar un
-    termino que siempre es cero."""
+    The last cumulative term (i=r) is always 0 (forecast and actual both sum
+    to 1), so it is omitted -- it doesn't change the result, it only avoids
+    summing a term that is always zero."""
     finished = matches[matches.status == "FINISHED"].copy()
     if team_key:
         finished = finished[(finished.home_team_key == team_key) | (finished.away_team_key == team_key)]
@@ -284,17 +284,17 @@ def matchday_rps_score(matches: pd.DataFrame, predictions: pd.DataFrame,
 
 def avg_goal_error(matches: pd.DataFrame, predictions: pd.DataFrame,
                     team_key: str | None = None) -> float | None:
-    """Error promedio de goles totales proyectados vs. el resultado real,
-    sobre las jornadas ya jugadas -- complementa a RPS (calibracion de las 3
-    probabilidades) con una lectura en goles, mas facil de interpretar para
-    quien no trabaja con modelos de probabilidad: "en promedio, el modelo se
-    equivoca por X goles en total por partido".
+    """Average error in total projected goals vs. the actual result, over
+    the matchdays already played -- complements RPS (calibration of the 3
+    probabilities) with a reading in goals, easier to interpret for someone
+    who doesn't work with probability models: "on average, the model is off
+    by X goals in total per match".
 
-    El marcador proyectado se aproxima redondeando lambda_home/lambda_away
-    (el gol esperado de cada equipo) en vez de recalcular la matriz de
-    marcadores completa con la correccion Dixon-Coles de goles bajos (rho) --
-    misma idea de fondo que scoreline_accuracy() pero sin necesitar rho por
-    jornada, una diferencia minima para una metrica agregada de temporada."""
+    The projected scoreline is approximated by rounding lambda_home/lambda_away
+    (each team's expected goals) instead of recomputing the full scoreline
+    matrix with the Dixon-Coles low-score correction (rho) -- same underlying
+    idea as scoreline_accuracy() but without needing rho per matchday, a
+    minimal difference for a season-aggregate metric."""
     finished = matches[matches.status == "FINISHED"].copy()
     if team_key:
         finished = finished[(finished.home_team_key == team_key) | (finished.away_team_key == team_key)]
@@ -311,27 +311,26 @@ def avg_goal_error(matches: pd.DataFrame, predictions: pd.DataFrame,
 
 def avg_real_goals(stats_matches: pd.DataFrame, all_matches: pd.DataFrame,
                     team_key: str | None = None) -> tuple[float | None, bool]:
-    """Promedio de goles REALES anotados por partido -- reemplaza al viejo
-    uso de avg_goal_error() en la tarjeta 'Avg goals', que en realidad
-    mostraba el error de proyeccion del modelo (|goles proyectados - goles
-    reales|), no un promedio de goles. Esta funcion sí devuelve el
-    promedio de goles anotados de verdad.
+    """Average REAL goals scored per match -- replaces the old use of
+    avg_goal_error() in the 'Avg goals' tile, which actually showed the
+    model's projection error (|projected goals - actual goals|), not an
+    average of goals. This function does return the actual average of goals
+    scored.
 
-    stats_matches: partidos de la jornada seleccionada en el filtro
-    MATCHDAY. Si ya tiene partidos FINISHED, el promedio se calcula solo
-    sobre esa jornada.
+    stats_matches: matches of the matchday selected in the MATCHDAY filter.
+    If it has FINISHED matches, the average is computed only over that
+    matchday.
 
-    all_matches: todos los partidos de la liga/temporada actual (ya
-    filtrados por liga desde app.py via load_matches). Sirve de fallback
-    cuando la jornada seleccionada todavia no se jugo -- en vez de "n/a",
-    la tarjeta muestra el promedio de goles de la temporada hasta la
-    fecha ("las jornadas que no se han jugado aprenden de las que ya se
-    jugaron"), siempre dentro de la misma liga para no mezclar el ritmo de
-    gol de LaLiga con el de Primeira Liga.
+    all_matches: all the matches of the current league/season (already
+    filtered by league in app.py via load_matches). It serves as a fallback
+    when the selected matchday hasn't been played yet -- instead of "n/a",
+    the tile shows the season's average goals so far ("matchdays that
+    haven't been played learn from the ones that have"), always within the
+    same league so as not to mix LaLiga's scoring rate with Primeira Liga's.
 
-    Devuelve (valor, es_promedio_de_temporada) para que quien llama pueda
-    ajustar la etiqueta segun si el numero es de la jornada exacta o del
-    fallback de temporada."""
+    Returns (value, is_season_average) so the caller can adjust the label
+    depending on whether the number is from the exact matchday or from the
+    season fallback."""
     def _avg(df: pd.DataFrame) -> float | None:
         finished = df[df.status == "FINISHED"]
         if team_key:
@@ -348,13 +347,13 @@ def avg_real_goals(stats_matches: pd.DataFrame, all_matches: pd.DataFrame,
 
 def avg_prob_on_actual(matches: pd.DataFrame, predictions: pd.DataFrame,
                         team_key: str | None = None) -> float | None:
-    """Probabilidad promedio (0-100%, mientras mas alto mejor) que el modelo
-    le dio al resultado que realmente ocurrio, sobre las jornadas jugadas.
-    Complementa al acierto 1X2 (binario: acerto o no el resultado MAS
-    probable) con que tan "convencido" estaba el modelo del resultado
-    correcto en promedio -- por ejemplo, un empate que el modelo daba al
-    35% (sin ser su favorito) cuenta distinto aca que uno al 5%, aunque
-    ambos casos sean un fallo en la metrica de acierto binario."""
+    """Average probability (0-100%, the higher the better) the model gave
+    to the outcome that actually happened, over the matchdays played.
+    It complements 1X2 accuracy (binary: did it get the MOST likely outcome
+    right or not) with how "convinced" the model was of the correct outcome
+    on average -- for example, a draw the model gave 35% (without it being
+    its favorite) counts differently here than one at 5%, even though both
+    are a miss in the binary accuracy metric."""
     finished = matches[matches.status == "FINISHED"].copy()
     if team_key:
         finished = finished[(finished.home_team_key == team_key) | (finished.away_team_key == team_key)]
@@ -370,7 +369,7 @@ def avg_prob_on_actual(matches: pd.DataFrame, predictions: pd.DataFrame,
 
 
 def matchday_status(matches: pd.DataFrame) -> tuple[int | None, int | None]:
-    """(ultima jornada jugada, proxima jornada) para esta liga/temporada."""
+    """(last matchday played, next matchday) for this league/season."""
     finished = matches[matches.status == "FINISHED"]
     last_finished = int(finished.matchday.max()) if not finished.empty else None
     upcoming_candidates = sorted(matches[matches.matchday > (last_finished or 0)].matchday.unique())
@@ -380,9 +379,9 @@ def matchday_status(matches: pd.DataFrame) -> tuple[int | None, int | None]:
 
 def matchday_accuracy_trend(matches: pd.DataFrame, predictions: pd.DataFrame,
                              team_key: str | None = None) -> tuple[list[int], list[float]]:
-    """% de aciertos 1X2 por jornada jugada, comparando el resultado
-    proyectado (predicted_outcome(), argmax + margen para el empate --
-    ver esa funcion) contra el resultado real."""
+    """% of 1X2 hits per matchday played, comparing the projected outcome
+    (predicted_outcome(), argmax + draw margin -- see that function)
+    against the actual result."""
     finished = matches[matches.status == "FINISHED"].copy()
     if team_key:
         finished = finished[(finished.home_team_key == team_key) | (finished.away_team_key == team_key)]

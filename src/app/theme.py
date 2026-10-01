@@ -1,12 +1,12 @@
 """
 theme.py
 --------
-CSS del tema oscuro/morado aprobado en el mockup (Design artifact,
-2026-09-26). Un solo bloque <style> inyectado una vez al inicio de la app;
-todo el resto del layout se arma con Streamlit + HTML/CSS propio via
-st.markdown(unsafe_allow_html=True), porque el estilo bespoke (score
-grande, chips, barra de probabilidad, mapa de calor) no se logra con los
-componentes nativos de Streamlit.
+CSS for the dark/purple theme approved in the mockup (Design artifact,
+2026-09-26). A single <style> block injected once at app start; the rest of
+the layout is built with Streamlit + custom HTML/CSS via
+st.markdown(unsafe_allow_html=True), because the bespoke style (big
+score, chips, probability bar, heat map) can't be achieved with Streamlit's
+native components.
 """
 
 import streamlit as st
@@ -85,14 +85,14 @@ def inject() -> None:
             background: linear-gradient(90deg, rgba(139,92,246,0) 0%, {ACCENT} 50%, rgba(139,92,246,0) 100%);
         }}
 
-        /* -- Segmentadores (selectbox de liga/equipo/jornada) --
-           Streamlit 1.4x+ arma st.selectbox sobre react-aria, con
-           data-testid/role estables (a diferencia de las clases
-           st-emotion-cache-* que cambian de build a build) -- por eso
-           todos los selectores de abajo se apoyan en esos atributos,
-           nunca en un nombre de clase generado. */
+        /* -- Slicers (league/team/matchday selectbox) --
+           Streamlit 1.4x+ builds st.selectbox on top of react-aria, with
+           stable data-testid/role attributes (unlike the
+           st-emotion-cache-* classes that change from build to build) --
+           that is why all the selectors below rely on those attributes,
+           never on a generated class name. */
 
-        /* tarjeta contenedora de cada filtro (st.container(border=True)) */
+        /* container card for each filter (st.container(border=True)) */
         div[data-testid="stVerticalBlockBorderWrapper"] {{
             background: {CARD_BG} !important;
             border: 1px solid {BORDER_SOFT} !important;
@@ -119,8 +119,8 @@ def inject() -> None:
         div[data-testid="stSelectbox"] button[aria-haspopup="listbox"] {{
             color: {MUTED_DIM} !important;
         }}
-        /* menu desplegable (se monta en un portal, por eso va suelto y no
-           anidado bajo stSelectbox) */
+        /* dropdown menu (it is mounted in a portal, which is why it sits
+           loose and not nested under stSelectbox) */
         [role="listbox"] {{
             background: {CARD_BG} !important;
             border: 1px solid rgba(139,92,246,0.35) !important;
@@ -136,14 +136,14 @@ def inject() -> None:
             background: rgba(139,92,246,0.18) !important;
         }}
 
-        /* botones Prev/Next del selector de jornada -- mismo tratamiento
-           oscuro/morado que el selectbox, en vez del boton claro por
-           defecto de Streamlit. Se ancla a la clase "st-key-<key>" que
-           Streamlit genera para todo widget con `key=...` (mecanismo
-           documentado y estable), en vez de data-testid="stVerticalBlockBorderWrapper"
-           -- ese wrapper ya no envuelve a los botones en la version actual
-           de Streamlit Cloud (verificado via DOM live), por eso la regla
-           anterior nunca hacia match. */
+        /* Prev/Next buttons of the matchday selector -- same dark/purple
+           treatment as the selectbox, instead of Streamlit's default light
+           button. It anchors to the "st-key-<key>" class that Streamlit
+           generates for every widget with `key=...` (a documented, stable
+           mechanism), instead of data-testid="stVerticalBlockBorderWrapper"
+           -- that wrapper no longer wraps the buttons in the current
+           version of Streamlit Cloud (verified via live DOM), which is why
+           the previous rule never matched. */
         div[class*="st-key-md_select_"] button {{
             background: {CARD_BG} !important;
             border: 1px solid {BORDER_SOFT} !important;

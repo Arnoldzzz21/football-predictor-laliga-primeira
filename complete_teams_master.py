@@ -1,9 +1,10 @@
 """
 complete_teams_master.py
-Completa teams_master.parquet: rellena football_data_org_id/short_code para
-los 5 ascendidos ya existentes (por nombre, no crea duplicados) y agrega el
-resto de equipos de LaLiga (PD) y Primeira Liga (PPL) con is_promoted_2026_27=False.
-Correr desde la raíz del proyecto: python complete_teams_master.py
+Completes teams_master.parquet: fills in football_data_org_id/short_code for
+the 5 already-existing promoted teams (by name, no duplicates are created) and
+adds the rest of the LaLiga (PD) and Primeira Liga (PPL) teams with
+is_promoted_2026_27=False.
+Run from the project root: python complete_teams_master.py
 """
 import os
 import re
@@ -20,7 +21,7 @@ from utils.parquet_io import read_partition, write_partition
 
 TOKEN = os.environ.get("FOOTBALL_DATA_TOKEN")
 if not TOKEN:
-    raise RuntimeError("FOOTBALL_DATA_TOKEN no está en las variables de entorno")
+    raise RuntimeError("FOOTBALL_DATA_TOKEN is not set in the environment variables")
 
 HEADERS = {"X-Auth-Token": TOKEN}
 BASE_URL = "https://api.football-data.org/v4/competitions/{code}/teams"
@@ -69,12 +70,12 @@ def main():
             })
         time.sleep(6)
 
-    print("Coincidencias encontradas para los ascendidos (revisa antes de seguir):")
+    print("Matches found for the promoted teams (review before continuing):")
     for key in existing_keys:
         if key in updates:
             print(f"  {key} -> football_data_org_id={updates[key][0]}, short_code={updates[key][1]}")
         else:
-            print(f"  {key} -> SIN MATCH por nombre, revisar a mano")
+            print(f"  {key} -> NO MATCH by name, check manually")
 
     for key, (fdid, short_code) in updates.items():
         mask = existing["team_key"] == key
@@ -84,7 +85,7 @@ def main():
     combined = pd.concat([existing, pd.DataFrame(new_rows)], ignore_index=True)[SCHEMA_COLS]
     table = pa.Table.from_pandas(combined, schema=TEAMS_MASTER_SCHEMA, preserve_index=False)
     write_partition(table, TEAMS_MASTER_PATH)
-    print(f"\nteams_master.parquet: {len(combined)} equipos totales ({len(new_rows)} nuevos)")
+    print(f"\nteams_master.parquet: {len(combined)} teams in total ({len(new_rows)} new)")
 
 
 if __name__ == "__main__":

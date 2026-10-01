@@ -1,14 +1,14 @@
 """
 components.py
 --------------
-Genera los bloques HTML/SVG del tema aprobado (scoreboard, barra de
-probabilidad, chips de resultados, KPIs, mapa de calor, tabla proyectada).
-Cada funcion regresa un string HTML pensado para st.markdown(html,
-unsafe_allow_html=True) -- no son componentes nativos de Streamlit porque
-el look bespoke del mockup no se logra con los widgets por defecto.
+Builds the HTML/SVG blocks of the approved theme (scoreboard, probability
+bar, scoreline chips, KPIs, heat map, projected table). Each function
+returns an HTML string meant for st.markdown(html, unsafe_allow_html=True)
+-- they are not native Streamlit components because the bespoke look of the
+mockup can't be achieved with the default widgets.
 
-Todo el texto visible en la app (lo que regresan estas funciones) va en
-ingles -- los comentarios/docstrings del codigo se quedan en espanol.
+All the visible text in the app (what these functions return) is in
+English -- code comments/docstrings are in English too.
 """
 
 from __future__ import annotations
@@ -33,14 +33,13 @@ def flag_svg(iso2: str, w: int = 28, h: int = 19) -> str:
 
 
 def _score_block(iso2: str, home_txt: str, away_txt: str, color: str, size: int = 30) -> str:
-    # .strip(): esta funcion se interpola DENTRO de otros f-strings
-    # multilinea (played_match_row, upcoming_match_card). Sin strip(), el
-    # salto de linea inicial de este bloque, sumado a la indentacion de la
-    # linea que lo llama, deja una linea compuesta solo por espacios justo
-    # antes del div del equipo visitante -- el parser de Markdown de
-    # Streamlit interpreta eso como fin del bloque HTML y el siguiente
-    # <div> (indentado 4 espacios) como bloque de codigo, mostrando el
-    # nombre del equipo visitante como texto crudo en vez de renderizado.
+    # .strip(): this function is interpolated INSIDE other multiline
+    # f-strings (played_match_row, upcoming_match_card). Without strip(), the
+    # leading newline of this block, plus the indentation of the line that
+    # calls it, leaves a line made up only of spaces right before the away
+    # team's div -- Streamlit's Markdown parser reads that as the end of the
+    # HTML block and the next <div> (indented 4 spaces) as a code block,
+    # showing the away team's name as raw text instead of rendered.
     return f"""
     <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
       {flag_svg(iso2)}
@@ -50,11 +49,11 @@ def _score_block(iso2: str, home_txt: str, away_txt: str, color: str, size: int 
 
 
 def _accuracy_badge(accuracy_pct: float) -> str:
-    """Badge de que tan cerca estuvo el marcador exacto proyectado del
-    resultado final (ver data_access.scoreline_accuracy). Marcador exacto
-    (100%) se muestra como un check en vez de un numero. Color en 3 niveles
-    para que se lea de un vistazo: verde = muy cerca, morado = razonable,
-    rojo = lejos."""
+    """Badge showing how close the projected exact scoreline was to the
+    final result (see data_access.scoreline_accuracy). An exact scoreline
+    (100%) is shown as a check mark instead of a number. 3-level color so
+    it reads at a glance: green = very close, purple = reasonable,
+    red = far."""
     if accuracy_pct >= 100:
         return (f'<span class="fp-badge" style="background:rgba(61,220,151,0.16); color:{GREEN};" '
                 f'title="The projected scoreline matched the final result exactly">'
@@ -155,14 +154,14 @@ def upcoming_match_card(home_name: str, away_name: str, iso2: str,
 
 
 def _quality_color(quality: float) -> str:
-    """Interpola en RGB entre RED (quality=0, peor) y GREEN (quality=1,
-    mejor) -- mismos tokens de color que ya usa el resto de la app (el
-    badge de scoreline_accuracy, la barra Home/Draw/Away), para que las
-    tarjetas KPI hablen el mismo idioma visual. 'quality' ya viene
-    normalizado 0-1 desde data_access.py/app.py (cada metrica define su
-    propio sentido de "mejor" antes de llegar aqui -- ej. RPS y el error de
-    goles son mejor mientras mas bajos, por eso su quality = 1 - valor
-    normalizado, no el valor crudo)."""
+    """Interpolates in RGB between RED (quality=0, worst) and GREEN
+    (quality=1, best) -- the same color tokens the rest of the app uses
+    (the scoreline_accuracy badge, the Home/Draw/Away bar), so the KPI tiles
+    speak the same visual language. 'quality' arrives already normalized
+    0-1 from data_access.py/app.py (each metric defines its own sense of
+    "better" before getting here -- e.g. RPS and goal error are better the
+    lower they are, which is why their quality = 1 - normalized value, not
+    the raw value)."""
     q = max(0.0, min(1.0, quality))
     red, green = (0xFF, 0x5C, 0x7A), (0x3D, 0xDC, 0x97)
     r, g, b = (round(red[i] + (green[i] - red[i]) * q) for i in range(3))
@@ -172,20 +171,19 @@ def _quality_color(quality: float) -> str:
 def kpi_tiles(tiles: list[dict]) -> str:
     """tiles: [{'value': str, 'label': str, 'quality': float | None}, ...].
 
-    Reemplaza al viejo kpi_bars(): ahi 4 metricas de distinta unidad y
-    escala (% de acierto, Brier score, desviacion de rating, conteo de
-    simulaciones) se forzaban a una barra con altura relativa, sugiriendo
-    una comparacion de magnitud entre ellas que no existia -- un
-    anti-patron de dataviz (mezclar unidades en un solo eje). Aqui cada
-    metrica es su propia tarjeta con su numero grande, sin eje ni barra
-    compartida.
+    Replaces the old kpi_bars(): there, 4 metrics with different units and
+    scale (accuracy %, Brier score, rating deviation, simulation count)
+    were forced into a bar with relative height, suggesting a magnitude
+    comparison between them that didn't exist -- a dataviz anti-pattern
+    (mixing units on a single axis). Here each metric is its own tile with
+    its big number, with no shared axis or bar.
 
-    'quality' (0 a 1, ya normalizado por quien llama) colorea el numero en
-    un degradado rojo->verde segun que tan bueno es ESE valor para esa
-    metrica especifica. 'quality'=None deja el numero en el color de texto
-    normal, para metricas que no son un indicador de calidad (ej. el
-    conteo de simulaciones Monte Carlo: mas simulaciones no es "mejor
-    modelo", solo dice cuanto computo se uso)."""
+    'quality' (0 to 1, already normalized by the caller) colors the number
+    in a red->green gradient depending on how good THAT value is for that
+    specific metric. 'quality'=None leaves the number in the normal text
+    color, for metrics that are not a quality indicator (e.g. the number
+    of Monte Carlo simulations: more simulations is not a "better model",
+    it just says how much compute was used)."""
     cells = ""
     for t in tiles:
         color = _quality_color(t["quality"]) if t.get("quality") is not None else TEXT
