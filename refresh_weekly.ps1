@@ -9,7 +9,7 @@
 # NO se hace push (nunca se sube data a medio actualizar).
 
 $ErrorActionPreference = "Stop"
-$ProjectRoot = "C:\Users\arnol\OneDrive\Documentos\Progaming\Datascience\datascience\football_predictor"
+$ProjectRoot = $PSScriptRoot
 $CondaEnv    = "coinvision_env312"
 $LogFile     = Join-Path $ProjectRoot "logs\weekly_refresh.log"
 
