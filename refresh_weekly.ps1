@@ -10,7 +10,6 @@
 
 $ErrorActionPreference = "Stop"
 $ProjectRoot = $PSScriptRoot
-$CondaEnv    = "coinvision_env312"
 $LogFile     = Join-Path $ProjectRoot "logs\weekly_refresh.log"
 
 New-Item -ItemType Directory -Force -Path (Join-Path $ProjectRoot "logs") | Out-Null
@@ -20,26 +19,30 @@ function Log($msg) {
     "$ts  $msg" | Tee-Object -FilePath $LogFile -Append
 }
 
-# Task Scheduler does not load the user's shell setup, so `conda` is usually
-# NOT on PATH when this script runs from a scheduled task. Instead of relying
-# on PATH, look for conda.exe in the usual install locations.
-function Find-Conda {
-    if ($env:CONDA_EXE -and (Test-Path $env:CONDA_EXE)) { return $env:CONDA_EXE }
+# Task Scheduler does not load the user's shell setup, so nothing can be
+# assumed to be on PATH. The notebooks run with a Python interpreter located
+# explicitly, in this order:
+#   1. $env:FOOTBALL_PYTHON, if set (full path to python.exe), else
+#   2. the first per-user Python install (newest first) under
+#      %LOCALAPPDATA%\Programs\Python that can import every package the
+#      pipeline needs, including nbconvert and ipykernel.
+function Test-PythonEnv($exe) {
+    $ErrorActionPreference = "Continue"   # native stderr must not abort the script
+    & $exe -c "import pandas, pyarrow, scipy, yaml, numpy, nbconvert, ipykernel" *> $null
+    return ($LASTEXITCODE -eq 0)
+}
 
-    $onPath = Get-Command conda -ErrorAction SilentlyContinue
-    if ($onPath) { return $onPath.Source }
+function Find-Python {
+    if ($env:FOOTBALL_PYTHON -and (Test-Path $env:FOOTBALL_PYTHON)) { return $env:FOOTBALL_PYTHON }
 
-    $roots = @(
-        "$env:USERPROFILE\anaconda3",
-        "$env:USERPROFILE\miniconda3",
-        "$env:LOCALAPPDATA\anaconda3",
-        "$env:LOCALAPPDATA\miniconda3",
-        "C:\ProgramData\anaconda3",
-        "C:\ProgramData\miniconda3"
-    )
-    foreach ($root in $roots) {
-        $exe = Join-Path $root "Scripts\conda.exe"
-        if (Test-Path $exe) { return $exe }
+    $root = Join-Path $env:LOCALAPPDATA "Programs\Python"
+    if (-not (Test-Path $root)) { return $null }
+    $candidates = Get-ChildItem $root -Directory -Filter "Python3*" |
+        Sort-Object Name -Descending |
+        ForEach-Object { Join-Path $_.FullName "python.exe" } |
+        Where-Object { Test-Path $_ }
+    foreach ($exe in $candidates) {
+        if (Test-PythonEnv $exe) { return $exe }
     }
     return $null
 }
@@ -47,14 +50,14 @@ function Find-Conda {
 Set-Location $ProjectRoot
 Log "===== Starting weekly refresh ====="
 
-$CondaExe = Find-Conda
-if (-not $CondaExe) {
-    Log "ERROR: conda.exe not found (not on PATH and not in the usual install folders)."
-    Log "Run 'conda info --base' in an Anaconda Prompt and add that folder to the roots list in Find-Conda."
+$PythonExe = Find-Python
+if (-not $PythonExe) {
+    Log "ERROR: no Python with pandas, pyarrow, scipy, pyyaml, numpy, nbconvert and ipykernel was found."
+    Log "Install the missing packages, or set the FOOTBALL_PYTHON user environment variable to the full path of the right python.exe."
     Log "===== Refresh finished WITH ERRORS ====="
     exit 1
 }
-Log "Using conda: $CondaExe"
+Log "Using python: $PythonExe"
 
 $notebooks = @(
     "Football_Data_Extraction.ipynb",
@@ -69,10 +72,10 @@ foreach ($nb in $notebooks) {
     Log "Running $nb ..."
     # Windows PowerShell 5.1 turns anything a native command writes to stderr
     # into a terminating error when $ErrorActionPreference is "Stop" and its
-    # output is redirected (conda/jupyter log progress to stderr). So relax
+    # output is redirected (nbconvert logs progress to stderr). So relax
     # it only around the native call and rely on the exit code instead.
     $ErrorActionPreference = "Continue"
-    & $CondaExe run -n $CondaEnv jupyter nbconvert --to notebook --execute --inplace "$nb" *>> $LogFile
+    & $PythonExe -m nbconvert --to notebook --execute --inplace "$nb" *>> $LogFile
     $exitCode = $LASTEXITCODE
     $ErrorActionPreference = "Stop"
     if ($exitCode -ne 0) {
