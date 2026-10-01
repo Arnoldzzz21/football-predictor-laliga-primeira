@@ -20,8 +20,41 @@ function Log($msg) {
     "$ts  $msg" | Tee-Object -FilePath $LogFile -Append
 }
 
+# Task Scheduler does not load the user's shell setup, so `conda` is usually
+# NOT on PATH when this script runs from a scheduled task. Instead of relying
+# on PATH, look for conda.exe in the usual install locations.
+function Find-Conda {
+    if ($env:CONDA_EXE -and (Test-Path $env:CONDA_EXE)) { return $env:CONDA_EXE }
+
+    $onPath = Get-Command conda -ErrorAction SilentlyContinue
+    if ($onPath) { return $onPath.Source }
+
+    $roots = @(
+        "$env:USERPROFILE\anaconda3",
+        "$env:USERPROFILE\miniconda3",
+        "$env:LOCALAPPDATA\anaconda3",
+        "$env:LOCALAPPDATA\miniconda3",
+        "C:\ProgramData\anaconda3",
+        "C:\ProgramData\miniconda3"
+    )
+    foreach ($root in $roots) {
+        $exe = Join-Path $root "Scripts\conda.exe"
+        if (Test-Path $exe) { return $exe }
+    }
+    return $null
+}
+
 Set-Location $ProjectRoot
 Log "===== Starting weekly refresh ====="
+
+$CondaExe = Find-Conda
+if (-not $CondaExe) {
+    Log "ERROR: conda.exe not found (not on PATH and not in the usual install folders)."
+    Log "Run 'conda info --base' in an Anaconda Prompt and add that folder to the roots list in Find-Conda."
+    Log "===== Refresh finished WITH ERRORS ====="
+    exit 1
+}
+Log "Using conda: $CondaExe"
 
 $notebooks = @(
     "Football_Data_Extraction.ipynb",
@@ -34,9 +67,16 @@ $notebooks = @(
 $failed = $false
 foreach ($nb in $notebooks) {
     Log "Running $nb ..."
-    & conda run -n $CondaEnv jupyter nbconvert --to notebook --execute --inplace "$nb" *>> $LogFile
-    if ($LASTEXITCODE -ne 0) {
-        Log "ERROR: $nb failed (exit $LASTEXITCODE). Aborting, no push."
+    # Windows PowerShell 5.1 turns anything a native command writes to stderr
+    # into a terminating error when $ErrorActionPreference is "Stop" and its
+    # output is redirected (conda/jupyter log progress to stderr). So relax
+    # it only around the native call and rely on the exit code instead.
+    $ErrorActionPreference = "Continue"
+    & $CondaExe run -n $CondaEnv jupyter nbconvert --to notebook --execute --inplace "$nb" *>> $LogFile
+    $exitCode = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+    if ($exitCode -ne 0) {
+        Log "ERROR: $nb failed (exit $exitCode). Aborting, no push."
         $failed = $true
         break
     }
@@ -57,10 +97,15 @@ if ([string]::IsNullOrWhiteSpace($changes)) {
 
 git add data
 git commit -m "Automatic weekly update: results and projections as of $(Get-Date -Format 'yyyy-MM-dd')"
-git push origin main *>> $LogFile
 
-if ($LASTEXITCODE -ne 0) {
-    Log "ERROR: git push failed (exit $LASTEXITCODE). Check your git credentials."
+# Same stderr caveat as above: git writes push progress to stderr.
+$ErrorActionPreference = "Continue"
+git push origin main *>> $LogFile
+$pushCode = $LASTEXITCODE
+$ErrorActionPreference = "Stop"
+
+if ($pushCode -ne 0) {
+    Log "ERROR: git push failed (exit $pushCode). Check your git credentials."
     exit 1
 }
 
