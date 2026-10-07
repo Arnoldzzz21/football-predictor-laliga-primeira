@@ -46,7 +46,7 @@ teams_master = load_teams_master()
 st.markdown(
     '<div class="mono" style="font-size:24px; font-weight:700;">Football Predictor</div>'
     '<div style="font-size:13px; color:#8892B0; margin-bottom:18px;">'
-    'LaLiga EA Sports · Primeira Liga — 2026-2027 Season</div>',
+    'LaLiga EA Sports · Primeira Liga</div>',
     unsafe_allow_html=True,
 )
 
