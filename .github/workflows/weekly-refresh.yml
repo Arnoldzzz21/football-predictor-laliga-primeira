@@ -1,0 +1,59 @@
+name: Weekly data refresh
+
+# Runs in GitHub's cloud, so no personal computer has to be on.
+# Tuesday 12:00 UTC = 6:00 AM El Salvador. It can also be started by hand from
+# the repo's Actions tab ("Run workflow").
+on:
+  schedule:
+    - cron: "0 12 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: weekly-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt requests nbconvert ipykernel
+
+      - name: Run the pipeline notebooks
+        env:
+          FOOTBALL_DATA_TOKEN: ${{ secrets.FOOTBALL_DATA_TOKEN }}
+        run: |
+          set -e
+          for nb in \
+            Football_Data_Extraction \
+            Matches_Silver_Builder \
+            Team_Ratings_Builder \
+            Match_Predictions_Builder \
+            Season_Simulations_Builder; do
+            echo "Running ${nb}.ipynb ..."
+            python -m nbconvert --to notebook --execute --inplace "${nb}.ipynb"
+            echo "${nb}.ipynb OK"
+          done
+
+      - name: Commit and push data if it changed
+        run: |
+          if [ -z "$(git status --porcelain -- data)" ]; then
+            echo "No changes in data/ -- nothing to upload."
+            exit 0
+          fi
+          git config user.name "Arnoldzzz21"
+          git config user.email "arnoldcuellar9@gmail.com"
+          git add data
+          git commit -m "Automatic weekly update: results and projections as of $(date -u +%Y-%m-%d)"
+          git push origin HEAD:main
