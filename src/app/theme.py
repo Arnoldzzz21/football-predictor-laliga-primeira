@@ -165,10 +165,131 @@ def inject() -> None:
             opacity: 0.3;
         }}
 
+        /* -- Layout classes used by components.py. They replace the old inline
+           styles so the @media rules at the bottom can reflow them on phones. -- */
+        .fp-pair {{ display: flex; gap: 20px; margin-bottom: 20px; }}
+        .fp-pair > .fp-card {{ flex: 1; min-width: 0; }}
+        .fp-card-head {{
+            display: flex; justify-content: space-between; align-items: center;
+            gap: 8px; flex-wrap: wrap; margin-bottom: 14px;
+        }}
+        .fp-badges {{ display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }}
+        .fp-teams {{
+            display: flex; align-items: center; justify-content: space-between; gap: 10px;
+        }}
+        .fp-team {{ flex: 1; min-width: 0; font-size: 15px; font-weight: 600; overflow-wrap: break-word; }}
+        .fp-team-away {{ text-align: right; }}
+        .fp-scorebox {{ display: flex; flex-direction: column; align-items: center; gap: 8px; }}
+        .fp-chips {{ display: flex; gap: 12px; flex-wrap: wrap; }}
+        .fp-toprow {{
+            display: flex; justify-content: space-between; gap: 12px;
+            padding: 6px 8px; border-radius: 8px;
+        }}
+        .fp-toprow-name {{ min-width: 0; overflow-wrap: break-word; }}
+        .fp-toprow-val {{ white-space: nowrap; }}
+
         .fp-footer {{
             text-align: center; font-size: 12px; color: {MUTED_DIM};
             margin-top: 32px; padding-top: 18px;
             border-top: 1px solid {BORDER_SOFT};
+        }}
+
+        /* ------------------------------------------------------------------
+           Phones and small tablets. The inline-style layout above is the
+           desktop layout; everything below only kicks in on narrow screens.
+           ------------------------------------------------------------------ */
+
+        /* The 4 filter cards = the only st.columns() row with exactly 4
+           columns. Structural selector on purpose (no key/class needed):
+           2x2 grid up to 900px; on phones Season+League share one row and
+           Team / Matchday get a full row each. Without this, Streamlit
+           stacks the 4 cards one under another (~1.5 screens of filters). */
+        @media (max-width: 900px) {{
+            div[data-testid="stHorizontalBlock"]:has(> div:nth-child(4)):not(:has(> div:nth-child(5))) {{
+                display: grid !important;
+                grid-template-columns: 1fr 1fr;
+                gap: 0.6rem !important;
+            }}
+            div[data-testid="stHorizontalBlock"]:has(> div:nth-child(4)):not(:has(> div:nth-child(5))) > div {{
+                width: auto !important; min-width: 0 !important; flex: none !important;
+            }}
+        }}
+
+        @media (max-width: 640px) {{
+            /* the league name is the longest label: give it more width than the season */
+            div[data-testid="stHorizontalBlock"]:has(> div:nth-child(4)):not(:has(> div:nth-child(5))) {{
+                grid-template-columns: 6fr 7fr;
+            }}
+            div[data-testid="stHorizontalBlock"]:has(> div:nth-child(4)):not(:has(> div:nth-child(5))) > div:nth-child(n+3) {{
+                grid-column: 1 / -1;
+            }}
+
+            /* Prev / select / Next stay on ONE row (Streamlit would stack the
+               3 columns). The row is the only one with exactly 3 columns. */
+            div[data-testid="stHorizontalBlock"]:has(> div:nth-child(3)):not(:has(> div:nth-child(4))) {{
+                flex-wrap: nowrap !important; flex-direction: row !important;
+                gap: 0.4rem !important; align-items: center;
+            }}
+            div[data-testid="stHorizontalBlock"]:has(> div:nth-child(3)):not(:has(> div:nth-child(4))) > div {{
+                min-width: 0 !important; width: auto !important;
+            }}
+            div[data-testid="stHorizontalBlock"]:has(> div:nth-child(3)):not(:has(> div:nth-child(4))) > div:nth-child(1),
+            div[data-testid="stHorizontalBlock"]:has(> div:nth-child(3)):not(:has(> div:nth-child(4))) > div:nth-child(3) {{
+                flex: 0 0 2.75rem !important;
+            }}
+            div[data-testid="stHorizontalBlock"]:has(> div:nth-child(3)):not(:has(> div:nth-child(4))) > div:nth-child(2) {{
+                flex: 1 1 0 !important;
+            }}
+
+            /* header: solid bar so the Fork/GitHub/menu icons don't float
+               over the content while scrolling; the content starts below it */
+            [data-testid="stHeader"] {{
+                background: rgba(8,6,13,0.94) !important;
+                backdrop-filter: blur(6px);
+            }}
+            .block-container {{
+                padding: 3.6rem 0.9rem 5rem 0.9rem !important;
+            }}
+
+            /* compact filter cards */
+            div[data-testid="stVerticalBlockBorderWrapper"] {{ border-radius: 14px !important; }}
+            div[data-testid="stVerticalBlockBorderWrapper"] > div {{ padding: 0.55rem 0.5rem !important; }}
+
+            /* touch targets: 44px, and 16px text in the inputs (iOS Safari
+               zooms the whole page when a focused input is smaller) */
+            div[data-testid="stSelectbox"] input[role="combobox"] {{ font-size: 16px !important; padding-left: 0.1rem !important; }}
+            div[data-testid="stSelectbox"] [role="group"] {{ min-height: 2.75rem; }}
+            [role="listbox"] [role="option"] {{ font-size: 15px !important; padding-top: 0.6rem; padding-bottom: 0.6rem; }}
+            div[class*="st-key-md_select_"] button {{ min-height: 2.75rem; font-size: 20px; }}
+
+            h5 {{ font-size: 1.05rem !important; line-height: 1.35; }}
+
+            /* match cards */
+            .fp-card {{ padding: 14px 14px; border-radius: 16px; }}
+            .fp-pair {{ flex-direction: column; gap: 12px; margin-bottom: 12px; }}
+            .fp-card-head {{ margin-bottom: 10px; }}
+
+            /* score (flag + result) on its own centered row; both team
+               names share the row below, so a long name like "RCD Espanyol
+               de Barcelona" gets ~140px instead of ~100px */
+            .fp-teams {{ flex-wrap: wrap; row-gap: 10px; }}
+            .fp-scorebox {{ order: -1; flex: 1 0 100%; flex-direction: row; justify-content: center; gap: 14px; }}
+            .fp-team {{ flex: 1 1 40%; font-size: 14px; }}
+            .fp-chips {{ gap: 8px; }}
+            .fp-chip {{ padding: 7px 12px; font-size: 12.5px; }}
+
+            .fp-toprow {{ flex-wrap: wrap; row-gap: 2px; font-size: 13px; }}
+            .fp-toprow-name {{ flex: 1 1 100%; }}
+            .fp-toprow-val {{ font-size: 12px; color: {MUTED}; }}
+
+            .fp-footer {{ margin-top: 20px; }}
+        }}
+
+        /* very narrow phones (360px): slightly smaller select text so
+           "LaLiga EA Sports" still fits next to the season */
+        @media (max-width: 380px) {{
+            div[data-testid="stSelectbox"] input[role="combobox"] {{ font-size: 14px !important; }}
+            div[data-testid="stVerticalBlockBorderWrapper"] > div {{ padding: 0.55rem 0.4rem !important; }}
         }}
         </style>
         """,
