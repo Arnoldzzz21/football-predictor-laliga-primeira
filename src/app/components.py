@@ -41,7 +41,7 @@ def _score_block(iso2: str, home_txt: str, away_txt: str, color: str, size: int 
     # HTML block and the next <div> (indented 4 spaces) as a code block,
     # showing the away team's name as raw text instead of rendered.
     return f"""
-    <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+    <div class="fp-scorebox">
       {flag_svg(iso2)}
       <div class="fp-score" style="font-size:{size}px; color:{color};">{home_txt} – {away_txt}</div>
     </div>
@@ -73,30 +73,30 @@ def played_match_row(home_name: str, away_name: str, iso2: str,
                       proj_h: int, proj_a: int, final_h: int, final_a: int,
                       matchday: int, accuracy_pct: float) -> str:
     return f"""
-    <div style="display:flex; gap:20px; margin-bottom:20px;">
-      <div class="fp-card fp-card-proj" style="flex:1;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+    <div class="fp-pair">
+      <div class="fp-card fp-card-proj">
+        <div class="fp-card-head">
           <span class="fp-eyebrow">Projected</span>
           <span class="fp-badge" style="background:rgba(148,142,168,0.14); color:{MUTED_DIM};">Pre-match</span>
         </div>
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-          <div style="flex:1;"><div style="font-size:15px; font-weight:600;">{home_name}</div></div>
+        <div class="fp-teams">
+          <div class="fp-team">{home_name}</div>
           {_score_block(iso2, proj_h, proj_a, MUTED_DIM)}
-          <div style="flex:1; text-align:right;"><div style="font-size:15px; font-weight:600;">{away_name}</div></div>
+          <div class="fp-team fp-team-away">{away_name}</div>
         </div>
       </div>
-      <div class="fp-card fp-card-final" style="flex:1;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <div class="fp-card fp-card-final">
+        <div class="fp-card-head">
           <span class="fp-eyebrow">Final result</span>
-          <div style="display:flex; gap:8px; align-items:center;">
+          <div class="fp-badges">
             {_accuracy_badge(accuracy_pct)}
             <span class="fp-badge" style="background:rgba(139,92,246,0.18); color:{ACCENT_LIGHT};">Final · MD{matchday}</span>
           </div>
         </div>
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-          <div style="flex:1;"><div style="font-size:15px; font-weight:600;">{home_name}</div></div>
+        <div class="fp-teams">
+          <div class="fp-team">{home_name}</div>
           {_score_block(iso2, final_h, final_a, TEXT)}
-          <div style="flex:1; text-align:right;"><div style="font-size:15px; font-weight:600;">{away_name}</div></div>
+          <div class="fp-team fp-team-away">{away_name}</div>
         </div>
       </div>
     </div>
@@ -125,14 +125,14 @@ def upcoming_match_card(home_name: str, away_name: str, iso2: str,
 
     return f"""
     <div class="fp-card" style="border:1px solid rgba(139,92,246,0.3); margin-bottom:20px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+      <div class="fp-card-head" style="margin-bottom:18px;">
         <span class="fp-eyebrow">Model projection</span>
         <span class="fp-badge" style="background:rgba(139,92,246,0.18); color:{ACCENT_LIGHT};">Upcoming · MD{matchday}</span>
       </div>
-      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:18px;">
-        <div style="flex:1;"><div style="font-size:16px; font-weight:600;">{home_name}</div></div>
+      <div class="fp-teams" style="margin-bottom:18px;">
+        <div class="fp-team">{home_name}</div>
         {_score_block(iso2, proj_h, proj_a, ACCENT_LIGHT, size=28)}
-        <div style="flex:1; text-align:right;"><div style="font-size:16px; font-weight:600;">{away_name}</div></div>
+        <div class="fp-team fp-team-away">{away_name}</div>
       </div>
       {live_note}
       <div style="margin-top:16px;">
@@ -147,7 +147,7 @@ def upcoming_match_card(home_name: str, away_name: str, iso2: str,
       </div>
       <div style="margin-top:18px; display:flex; flex-direction:column; gap:10px;">
         <span class="fp-eyebrow">Most likely scorelines</span>
-        <div style="display:flex; gap:12px; flex-wrap:wrap;">{chips}</div>
+        <div class="fp-chips">{chips}</div>
       </div>
     </div>
     """
@@ -206,8 +206,8 @@ def top_table_html(rows: list[dict]) -> str:
         hi = r["pos"] <= 4
         bg = "background:rgba(139,92,246,0.12);" if hi else ""
         body += (
-            f'<div style="display:flex; justify-content:space-between; padding:6px 8px; border-radius:8px; {bg}">'
-            f'<span>{r["pos"]}. {r["name"]}</span>'
-            f'<span class="mono">{r["avg_position"]:.1f} · {r["prob_champions_league"]*100:.0f}% UCL</span></div>'
+            f'<div class="fp-toprow" style="{bg}">'
+            f'<span class="fp-toprow-name">{r["pos"]}. {r["name"]}</span>'
+            f'<span class="mono fp-toprow-val">{r["avg_position"]:.1f} · {r["prob_champions_league"]*100:.0f}% UCL</span></div>'
         )
     return f'<div style="display:flex; flex-direction:column; gap:8px; font-size:13px;">{body}</div>'
